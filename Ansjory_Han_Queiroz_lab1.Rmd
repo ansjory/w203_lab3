@@ -5,229 +5,430 @@ date: 5/25/2018
 output: pdf_document
 ---
 
+## Introduction
 
+This analysis is motivated by the following question:
 
-#Overview
-
-The goal of this lab is to provide you with an opportunity to use R and gain experience performing exploratory data analysis (EDA). In this lab, you will be asked to find new insight into a data set by assessing the underlying structure, evaluating the variables, detecting outliers and anomalies, and so on. 
-
-This is a group lab.  Each team has been assigned a different dataset to work on.  In your assigned folder, you will find a file containing background information on your data, along with a research objective and any instructions that are specific to your team.
-
-Please note that you will be working with real data, but it may have been modified by your instructors to test your abilities.
-
-Although your assigned topic may be the focus of an existing literature, we recommend that you do not spend your time researching what others have done, or gaining significant domain expertise.  The purpose of the lab is to see how well you can apply exploratory techniques.  Moreover, the background we have provided in your assignment should be sufficient to guide your analysis.\footnote{We also do not want you to be led astray by the bad advice that is common on the internet.}
-
-#Assignment
-
-Generate an exploratory analysis to address the goals found in your assigned folder.
-
-Be sure to follow the guidelines we covered in class.  Remember that you are to use descriptive tools (no inference), but note any features you find that you think would be relevant to statistical modeling.
-
-Your analysis should be thorough, but limit your report to a maximum of 25 pages.  This means that you will have to make choices about what variables and relationships to focus on (and justify those choices).
-
-To assist with evaluation, we are providing the following outline for your report.  As you work, you may fill in each section with your analysis.
-
-### Introduction (20 pts)
-
-#### State the research question that motivates your analysis.
-
+\begin{center}
 How is the amount of parking violations received by a UN diplomat related to the country corruption index?
+\end{center}
 
+Imagine that we have been hired by the World Bank to study the effect of cultural norms and legal enforcement in controlling corruption by analyzing the parking behavior of United Nations ocials in Manhattan. Until 2002, diplomatic immunity protected UN diplomats from parking enforcement actions, so diplomats actions were constrained by cultural norms alone. In 2002, enforcement authorities acquired the right to conscate diplomatic license plates of violators, after which diplomatic behavior was constrained by both cultural norms and the legal penalties of unpaid tickets. The World Bank would like to know what if any relationship there is between corruption and parking violations both pre and post 2002 and if there are any other relevant explanatory variables.
+
+Cultural norms are unwritten yet well accepted behaviors that are established through years of society development. Different historic backgrounds and geographical particularities drive different set of standard behaviors and what is considered normal in one region, may be seen as unacceptable in a different area. However, when different cultures are invited to interact, we may have a rare opportunity to analyze the differences in a normalized environment. One good example of these opportunities happens at the United Nations (UN) office in New York, NY, USA, where diplomats from all major countries in the world interact not only on state interests, but also with more mundane tasks like having lunch, informal talks and even finding parking spots in Manhattan area. Maybe those day-to-day activities are even a better cultural indicator, since they have no bounds driven by commercial and/or diplomatic interests of one’s country. Encouraged by the World Bank, we analyzed data from parking violations made by UN diplomats in Manhattan area and compare two scenarios: pre and post 2002, when local enforcement authorities acquired the right to confiscate diplomatic license plates, forcing the diplomats to deal with not only the cultural norms they were used before, but also with legal penalties of unpaid tickets.
+
+## Setup
+
+Set up the working directory by putting data file and Rmd file in the same directory.
 ```{r setup, include=FALSE}
 knitr::opts_knit$set(root.dir='~/Documents/UC Berkeley MIDS/Summer 2018/DATASCI W203/Lab_1/Corruption_EDA')
 ```
 
-#### Load your data set into R. 
+Load all necessary libraries for the R functions.
+```{r}
+library(car)
+library("dplyr")
+library(scales)
+library("ggplot2")
+library("cowplot")
+```
+
+Load the data set into R. 
 ```{r}
 load("Corrupt.RData")
 ```
 
-#### Describe your data set.  What types of variables does it contain?  How many observations are there?
+## Data Validation and Selection
+The raw dataset consists of 'r nrow(FMcorrupt)' observations of 'r ncol(FMcorrupt)' variables that shows economic, cultural and geographical aspects of countries that attended UN meetings pre and post the 2002 law change. A glimpse of that data is shown below:
 
-We note that we have 364 observations and 28 variables.
-```{r}
-nrow(FMcorrupt)
-```
-
-```{r}
+```{r, warning= FALSE}
 str(FMcorrupt)
 ```
 
-#### Evaluate the data quality. Are there any issues with the data? Explain how you handled these potential issues. 
+For a better understanding of this data set, we provide a variable description bellow:
+
+Variable Name     | Description
+------------------|---------------
+wbcode            | Country 3 letter code
+prepost           | __Pre:__ data pre-2002, __Pos:__ data post-2002 
+violations        | Unpaid New York City parking violations
+fines             | Unpaid fines due to violations (USD)
+mission           | Number of missions in NY
+staff             | Number of staff people in NY
+spouse            | Number of diplomat family people in NY
+gov_wage_gdp      | Not specified in enunciate.
+pctmuslim         | Percent of Muslims in population
+majoritymuslim    | Is a country with majority Muslim? (Dummy)
+trade             | total trade with the US in 1998
+cars_total        | total number of diplomatic licensed cars in NY
+cars_personal     | Number of personal-use cars with diplomatic plates in NY
+cars_mission      | Number of professional-use cars with diplomatic plates in NY
+pop1998           | Country's population in 1998
+gdppcus1998       | Not specified in enunciate.
+ecaid             | Not specified in enunciate.
+milaid            | Not specified in enunciate.
+region            | Region code variable. To be studied.
+corruption        | Country Corruption index
+totaid            | Not specified in enunciate.
+r_africa          | Country belongs to Africa? (Dummy)
+r_middleeast      | Country belongs to Middle East? (Dummy)
+r_europe          | Country belongs to Europe? (Dummy)
+r_southamerica    | Country belongs to South America? (Dummy)
+r_asia            | Country belongs to Asia? (Dummy)
+country           | Country's name
+distUNplz         | Not specified in enunciate.
+
+However, provided that we want to answer the question __"How is the amount of parking violations received by a UN diplomat related to the country corruption index?"__, some transformation were made to the data to best fit our research demands:
+
+* First we dropped the observations where violations and/or fines data were not available
+```{r, include=FALSE, warning= FALSE}
+corrupt <- FMcorrupt[!is.na(FMcorrupt$violations),]
+```
+
+* Second we used the columns related to the geographical position to populate a new column, containing the name of the region for ploting purposes.
+  + Africa is region 6:
 ```{r}
-summary(FMcorrupt$violations)
+subcase_africa = corrupt$r_africa == 1 & !is.na(corrupt$r_africa)
+corrupt_africa = corrupt[subcase_africa, ]
+head(subset(corrupt_africa, select = c ("wbcode", "region", "country")), 10)
 ```
+  + Asia is region 4:
+```{r}
+subcase_asia = corrupt$r_asia == 1 & !is.na(corrupt$r_asia)
+corrupt_asia = corrupt[subcase_asia, ]
+head(subset(corrupt_asia, select = c ("wbcode", "region", "country")), 10)
+```
+  + South America is region 2:
+```{r}
+subcase_sa = corrupt$r_southamerica == 1 & !is.na(corrupt$r_southamerica)
+corrupt_sa = corrupt[subcase_sa, ]
+head(subset(corrupt_sa, select = c ("wbcode", "region", "country")), 10)
+```  
+  + Middle East is region 7:
+```{r}
+subcase_me = corrupt$r_middleeast == 1 & !is.na(corrupt$r_middleeast)
+subcase_me = corrupt[subcase_me, ]
+head(subset(subcase_me, select = c ("wbcode", "region", "country")), 10)
+```
+  + Europe is region 3:
+```{r}
+subcase_europe = corrupt$r_europe == 1 & !is.na(corrupt$r_europe)
+corrupt_europe = corrupt[subcase_europe, ]
+head(subset(corrupt_europe, select = c ("wbcode", "region", "country")), 10)
+```
+  + North and Central America is region 1:
+```{r}
+head(subset(corrupt[corrupt$region == 1,], select = c("wbcode", "region", "country")), 10)
+
+```
+  + Oceania is region 5:
+```{r}
+head(subset(corrupt[corrupt$region == 5,], select = c("wbcode", "region", "country")), 10)
+subcase_oceania = corrupt$region == 5
+corrupt_oceania = corrupt[subcase_oceania,]
+```
+  + Creating the new variable:
+```{r}
+reg_labels = c("North and Central America", "South America", "Europe",
+               "Asia", "Oceania", "Africa", "Middle East")
+reg_levels = c(1,2,3,4,5,6,7)
+corrupt$region_label <- factor(corrupt$region, levels = reg_levels, labels = reg_labels) 
+```
+
+* Third we dropped columns that will not be usefull for our analisys, to 
+```{r}
+new_corrupt <- subset( corrupt, select = -c(mission, gov_wage_gdp, pctmuslim, 
+                                            majoritymuslim, gdppcus1998, ecaid, 
+                                            milaid, cars_total, totaid, r_africa, 
+                                            r_middleeast, r_europe, r_southamerica,
+                                            r_asia, distUNplz), drop = FALSE)
+```
+
+When performing a last check in the data we found that some observation still miss their region, trade and number of cars. We fixed the region variable, while ignoring the tradee and car count since they may not be essencial for our analysis.
+```{r}
+summary(new_corrupt)
+
+new_corrupt[is.na(new_corrupt$region_label),]
+
+new_corrupt["345", "region"] <- 6
+new_corrupt["346", "region"] <- 6
+new_corrupt["345", "region_label"] <- "Africa"
+new_corrupt["346", "region_label"] <- "Africa"
+
+```
+
+As a final sanity test, each country must have exactly 2 observations, one before and one after the 2002 law enforcement. With a 298 observations data set that also must have exactly 149 observations for before and after 2002:
+```{r}
+max(table(new_corrupt$wbcode))
+min(table(new_corrupt$wbcode))
+table(new_corrupt$prepost)
+```
+
+Finally, we have our working data set, with 298 observations of 14 variables. This means we can analyze data of 149 countries for insights on how the traffic violations are correlated with a country's corruption index and how this is affected by the introduction of legal penalties.
+
+Variable Name     | Description
+------------------|---------------
+wbcode            | Country 3 letter code
+prepost           | __Pre:__ data pre-2002, __Pos:__ data post-2002 
+violations        | Unpaid New York City parking violations
+fines             | Unpaid fines due to violations (USD)
+staff             | Number of staff people in NY
+spouse            | Number of diplomat family people in NY
+trade             | Total trade with the US in 1998
+cars_personal     | Number of personal-use cars with diplomatic plates in NY
+cars_mission      | Number of professional-use cars with diplomatic plates in NY
+pop1998           | Country's population in 1998
+region            | Region code
+corruption        | Country Corruption index
+country           | Country's name
+region_label      | Region name
+
+
+## Exploratory Analysis
+
+As stated before, in 2002 the New Youk authorities acquired the right to confiscate diplomatic license plates. Those plates are issued for diplomatic missions staff cars and for cars of personal use of the main diplomats and their families. Until 2002, therefore, the diplomats and their families where not required to pay for their traffic tickets, i.e., their only incentive for paying was the cultural norms of their society. However after 2002 an extra incentive was introduced, now a legal and economical one, which impacted the diplomatic community and their traffic habits. 
+
+Before the enforcement of paying tickets a diplomatic mission had a median of 51.65 unpaid violations: 
 
 ```{r}
-summary(FMcorrupt$corruption)
+summary(new_corrupt[new_corrupt$prepost == "pre",]$violations)
+pre_corrupt <- new_corrupt[new_corrupt$prepost == "pre",]
 ```
 
-#### Explain whether any data processing or preparation is required for your data set. 
-
+After it this number dropped to 1.31:
 ```{r}
-subcase_nona = !is.na(FMcorrupt$corruption)
-FMcorrupt_nona = FMcorrupt[subcase_nona, ]
-nrow(FMcorrupt_nona)
+summary(new_corrupt[new_corrupt$prepost == "pos",]$violations)
+pos_corrupt <- new_corrupt[new_corrupt$prepost == "pos",]
 ```
 
-### Univariate Analysis of Key Variables (20 pts)
-
-#### Use visualizations and descriptive statistics to perform a univariate analysis of each key variable. Be sure to describe any anomalies, coding issues, or potentially erroneous values.  Explain how you respond to each issue you identify.  Note any features that appear relevant to statistical analysis.  Discuss what transformations may be appropriate for each variable.
-```{r car}
-library(car)
+This big difference can be easier noted with a barplot:
+```{r}
+pp_corrupt <- arrange(new_corrupt, desc(new_corrupt$prepos))
+barplot(pp_corrupt$violations, col = "blue", ylim = c(0,500), main = "Unpaid NY parking violations (diplomatic plates)", border = NA, xpd = F, xlab = "time")
 ```
 
+We begin the scatterplot matrix. We want to get a high level overview. The general pattern between pre-2002 and post-2002 are very similar:
 ```{r}
 scatterplotMatrix(~ violations + corruption + trade + region, 
-                  data = FMcorrupt_nona, 
+                  data = pre_corrupt, 
+                  diagonal=list(method="histogram", breaks="FD"),
                   main = "Scatterplot Matrix for Key Variables")
 ```
 
-### Analysis of Key Relationships (30 pts)
-
-#### Explore how your outcome variable is related to the other variables in your dataset. Make sure to use visualizations to understand the nature of each bivariate relationship.
-
-First, use plot to figure out the relationship between violations and corruptions. From the plot, the majority of density of violations take place in the corruptions between 0 and 1.
-```{r}
-plot(jitter(FMcorrupt_nona$corruption, factor=2), jitter(FMcorrupt_nona$violations, factor=2), xlab = "corruptions", ylab = "violations")
-abline(lm(FMcorrupt_nona$violations ~ FMcorrupt_nona$corruption))
-```
-
-Then, inspect the relationship between violations and majoritymuslim. There is no clear correlation between them.
-```{r}
-plot((FMcorrupt_nona$majoritymuslim),(FMcorrupt_nona$violations), xlab = "majoritymuslim", ylab = "violations")
-abline(lm(FMcorrupt_nona$violations ~ FMcorrupt_nona$majoritymuslim))
-```
-
-Now, trying to plot the corruptions against each region. Region 6 has the most distribution of corruptions between 0 and 1.
-```{r}
-plot((FMcorrupt_nona$region), (FMcorrupt_nona$corruption), xlab = "region", ylab = "corruptions")
-abline(lm(FMcorrupt_nona$corruption ~ FMcorrupt_nona$region))
-```
-
-Region 6 tends to have lower total trade with United States. 
-```{r}
-plot(FMcorrupt_nona$region, log(FMcorrupt_nona$trade), xlab = "region", ylab = "trade")
-abline(lm(FMcorrupt_nona$trade ~ FMcorrupt_nona$region))
-```
-
-Region 6 has the most UN diplomats presence.
-```{r}
-hist(FMcorrupt_nona$region, breaks = 0:8 - 0.5, xlab = "region")
-axis(1, at = 0:8)
-```
-
-### What tranformations can you apply to clarify the relationships you see in the data?  Be sure to justify each transformation you use.
-
-Now, use transformation to find relationship between region number and the region name:
-
-Region 6 = Africa
-```{r}
-subcase_africa = FMcorrupt_nona$r_africa == 1 & !is.na(FMcorrupt_nona$r_africa)
-FMcorrupt_africa = FMcorrupt_nona[subcase_africa, ]
-summary(FMcorrupt_africa$region)
-```
-
-Region 7 = Middle East
-```{r}
-subcase_middleeast = FMcorrupt_nona$r_middleeast == 1 & !is.na(FMcorrupt_nona$r_middleeast)
-FMcorrupt_middleeast = FMcorrupt_nona[subcase_middleeast, ]
-summary(FMcorrupt_middleeast$region)
-```
-
-Region 3 = Europe
-```{r}
-subcase_europe = FMcorrupt_nona$r_europe == 1 & !is.na(FMcorrupt_nona$r_europe)
-FMcorrupt_europe = FMcorrupt_nona[subcase_europe, ]
-summary(FMcorrupt_europe$region)
-```
-
-Region 2 = South America
-```{r}
-subcase_southamerica = FMcorrupt_nona$r_southamerica == 1 & !is.na(FMcorrupt_nona$r_southamerica)
-FMcorrupt_southamerica = FMcorrupt_nona[subcase_southamerica, ]
-summary(FMcorrupt_southamerica$region)
-```
-
-Region 4 = Asia
-```{r}
-subcase_asia = FMcorrupt_nona$r_asia == 1 & !is.na(FMcorrupt_nona$r_asia)
-FMcorrupt_asia = FMcorrupt_nona[subcase_asia, ]
-summary(FMcorrupt_asia$region)
-```
-
-### Analysis of Secondary Effects (10 pts)
-
-#### What secondary variables might have confounding effects on the relationships you have identified?  Explain how these variables affect your understanding of the data.
-
-The variable prepost can further segment the data set to see if there is any effect of legal penalities against the violations after 2002.
-```{r}
-subcase_pre = FMcorrupt_nona$prepost == "pre"
-FMcorrupt_pre = FMcorrupt_nona[subcase_pre, ]
-nrow(FMcorrupt_pre)
-```
-
-```{r}
-summary(FMcorrupt_pre)
-```
-
-```{r}
-subcase_post = FMcorrupt_nona$prepost == "pos"
-FMcorrupt_post = FMcorrupt_nona[subcase_post, ]
-nrow(FMcorrupt_post)
-```
-
-```{r}
-summary(FMcorrupt_post)
-```
-
-The overall trends between Pre 2002 and Post 2002 are basically the same. However, the overall violations are comparatively lower Post 2002 with same trend as Pre 2002.
 ```{r}
 scatterplotMatrix(~ violations + corruption + trade + region, 
-                  data = FMcorrupt_pre, 
-                  main = "Scatterplot Matrix for Key Variables Pre 2002")
+                  data = pos_corrupt, 
+                  diagonal=list(method="histogram", breaks="FD"),
+                  main = "Scatterplot Matrix for Key Variables")
 ```
+
+Violations is our dependent variable to look at. Interestingly, there seems little or no relationship between parking violations and corruption index. Rather, violations seems to have strong postive relationship with fines.
+```{r}
+cor(new_corrupt$violations, new_corrupt$corruption, use="complete.obs")
+cor(new_corrupt$violations, new_corrupt$fines, use="complete.obs")
+```
+
+Apart from looking at the violations, we notice the corruption index and trade may have some negative relationship.
+```{r}
+cor(new_corrupt$corruption, new_corrupt$trade, use="complete.obs")
+```
+
+Overall, the plot suggests that violations and corruption may not really related. The fines variable is what we can dig further to see if it affects the bivariate relationships.
+Since our outcome variable is parking violations (violations). we summarize and create a histogram.
+```{r}
+summary(new_corrupt$violations)
+hist(new_corrupt$violations, breaks="FD", main="Unpaid of Violations", xlab=NULL)
+```
+
+Visually, the histogram shows to have a postive skew. The vast majority of the data is less than $500 unpaid.
+
+### Parking violations and corruption
+
+It's easy to see that after the law enforcement all diplomats started paying their tickets, with a few exception cases. Therefore, we want to base our analysis on the time pre-enforcement. The question we want to answer is:
+
+__"How is the amount of parking violations received by a UN diplomat related to the country corruption index?"__
+
+One of the available variables in our dataset was the corruption index for each country in 1998. We will consider that index is relatevelly stable through years and its analisys can be extended to the years after 2002. The corruption index is negative when a country have low corruption cases, and may be greater then 0 if a particular country have more corruption cases reported. To correlate that index with parking violations the first plot made was a scatterplot relating number of violations and corruption index:
+```{r, warning= FALSE}
+plot(pre_corrupt$corruption, pre_corrupt$violations, 
+     main = "Corruption vs Violations (before 2002)", xlab = "Country Corruption Index", 
+     ylab = "Number of unpaid violations", col = alpha("red",0.5), pch = 16, alpha = 50)
+```
+ 
+This plot tells us that there is little or no linear relationship bettween violations and corruption variables. Earlier we also know the correlation between two is 0.078, which does not have much magnitude to show there is a linear relationship.
+```{r}
+ boxplot(violations ~ corruption, data = new_corrupt,
+main = "Unpaid Violation by Different Levels of Corruption", xlab = "Corruption", ylab = "Violation")
+```
+ 
+The relationship does not appear linear and too much noises. We noticed that the majority of violations is under 500. We want to see what happen if only looking at violations under 500.
+```{r}
+Sub2<-subset(new_corrupt, new_corrupt$violations<=500)
+boxplot(violations ~ corruption, data = Sub2,
+main = "Unpaid Violation by Different Levels of Corruption", varwidth=TRUE,
+xlab = "Corruption", ylab = "Violation")
+```
+ 
+If we only look at violations under 500, the results still look little or no linear relationship.
+```{r}
+violations_mean<-by(new_corrupt$violations, new_corrupt$corruption, mean, na.rm=T)
+plot(sort(unique(new_corrupt$corruption)), violations_mean, xlab = "corruption", ylab = "violations",
+main = "Mean of Unpaid Violations by Levels of Corruption")
+```
+
+We plot the mean of violations for each levels of corruption for better assess the relationship. Violation above around 500 might be deemed as outliers. Also, the corruption index between -1 and 1 contain more unpaid violations. To focus our attention on levels of corruption, we might speculate and want to bin our corruption variable into intervals.
+```{r}
+ corruption_bin = cut(new_corrupt$corruption, breaks = c(-3,-1,1, Inf),
+labels = c("Little or No Corruption", "Moderate Corruption", "High Corruption"))
+summary(corruption_bin)
+boxplot(violations ~ corruption_bin, data = new_corrupt, cex.axis = .7,
+main = "Unpaid Violations by Corruptive Attainment", ylab = "Unpaid Violations")
+```
+
+The resulting boxplot shows the unpaid violations for each group. It could tells us different story. If we only look at unpaid violations under 500, the results might gives us more granular level of detailed relationship.
+```{r}
+### if we only look at unpaid violations under 500
+corruption_bin = cut(Sub2$corruption, breaks = c(-3,-1,1, Inf),
+labels = c("Little or No Corruption", "Moderate Corruption", "High Corruption"))
+boxplot(violations ~ corruption_bin, data = Sub2, cex.axis = .7,
+main = "Unpaid Violations by Corruptive Attainment", ylab = "Unpaid Violations")
+```
+
+### Trade and corruption
 
 ```{r}
-scatterplotMatrix(~ violations + corruption + trade + region, 
-                  data = FMcorrupt_post, 
-                  main = "Scatterplot Matrix for Key Variables Post 2002")
+trade_mean2<-by(new_corrupt$trade, new_corrupt$corruption, mean, na.rm=T)
+plot(sort(unique(new_corrupt$corruption)), trade_mean2, xlab = "corruption", ylab = "trade",
+main = "Mean Trade by Levels of Corruption")
 ```
 
-### Conclusion (20 pts)
-#### Summarize your exploratory analysis. What can you conclude based on your analysis?  
-
-The major contribution to diplomatic behavior is cultural norm and legal penalties don't alter the behavior but only suppress the violations. The diplomats from Africa have the significant contribtions to the violations indicated by the Country corruption index between 0 and 1, and lower total trade with the United States. The amount of African diplomats is the most among diplomats from other regions.
+Similary, in the grpah, we don’t see a very clear relationship between trade and corruption. However, we could see most of the lower trade fall between the corruption index -1 and 1. Binning into three corruption intervals could help us understand more detailed.
 ```{r}
-
+corruption_bin = cut(new_corrupt$corruption, breaks = c(-3,-1,1, Inf),
+labels = c("Little or No Corruption", "Moderate Corruption", "High Corruption"))
+boxplot(trade ~ corruption_bin, data = new_corrupt, cex.axis = .7,
+main = "Number of Trade with US by Corruptive Attainment", ylab = "Trade with US")
 ```
 
-# Evaluation
+### Region and corruption
+Now, trying to plot the corruptions against each region. Region 6 (Africa) has the most distribution of corruptions 4
+between 0 and 1.
+```{r}
+plot(new_corrupt$region, new_corrupt$corruption, xlab = "region", ylab = "corruputions")
+```
 
-We will evaluate your report for technical correctness, but also clarity and overall effectiveness.  A point distribution is provided with the above outline.  In addition to these point totals, we will impose penalties for output dumps, unclear language, and other errors.
+Region 6 (Africa) tends to have lower total trade with United States.
+```{r}
+plot(new_corrupt$region, log(new_corrupt$trade), xlab = "region", ylab = "trade")
+```
 
+Region 6 (Africa) has the most UN diplomats presence.
+```{r}
+hist(new_corrupt$region, breaks = 0:8 - 0.5, xlab = "region", main = "Diplomats per region")
+```
 
-# Submission
+### Number of Cars
+ 
+As seen, most of the countries seems to lie on the lower part of the violations, with some outliers. However we may see some trend where higher corruption index correlates with higher amount of unpaid tickets. Two hypothesis were raised in order to clarify this relationship:
 
-Only one student in the team needs to submit via the ISVC.  Make sure that you include the names of all group members in your report.
+* Countries with more diplomats may have more cars.
+* Countries with more cars assigned to their missions may have more tickets. 
 
-You must turn in
-\begin{enumerate}
-\item Your pdf report.  In this report, do not suppress the R code that generates your output.
-\item The source file you use to generate your report (i.e. your Rmd file)
-\end{enumerate}
+To test the first hypothesys we may see the distribution of total personnel vs number of cars.
+```{r, warning=FALSE}
+plot(pre_corrupt$staff + pre_corrupt$spouse, 
+     pre_corrupt$cars_mission + pre_corrupt$cars_personal, 
+     main = "Total cars vs Total personnel", 
+     xlab = "Personnel (including staff and families)", 
+     ylab = "Total Cars", col = alpha("blue",0.5), pch = 16, alpha = 50)
+```
 
-Use the following naming convention for your files:
+It is clear that the correlation is true, and we can highlight the case of Russia, with 167 persons assigned to thei diplomatic mission somehow and 116 vehicles.
 
-- lastname1_lastname2_lab1.pdf
-- lastname1_lastname2_lab1.Rmd
+To test the second hypothesis we identified that more than 20% of the countries have either one or two cars. In order to improve visualization the total car count were tranformed in a new categorized variable.
+```{r}
+car_bins = seq(0,120, by = 2)
+y1 <- hist(pre_corrupt$cars_mission + pre_corrupt$cars_personal, 
+           breaks = car_bins, xlim = c(0,20), col = "light green",
+     main = "Car Count Histogram", xlab = "Total cars per mission", axes = F)
+axis(1, at = seq(0,20, by = 2))
+axis(2)
 
+pre_corrupt$cat_car <- cut(pre_corrupt$cars_personal + pre_corrupt$cars_mission,
+                           c(0,2,10,120))
+barplot(table(pre_corrupt$cat_car),col = "light blue",
+        main = "Count of total cars by categories", 
+        ylim = c(0,80), ylab = "count", xlab = "bins")
+```
 
-## Due Date
+When verified how small missions, with 2 or less cars compares to the others, we see that they tend to have less tickets:
+```{r, warning= FALSE}
+up_to_two <- ggplot(pre_corrupt[pre_corrupt$cat_car == "(0,2]",], 
+  aes(x = wbcode, y = violations)) +
+  geom_point(size = 1) + theme(axis.text.x=element_blank()) +
+  labs(x="Countries", y = "# of Violations", title = "0 ~ 2") +
+  scale_y_continuous(limits = c(0,1000))
 
-This lab is due 24 hours before the week 4 live session.
+three_to_ten <- ggplot(pre_corrupt[pre_corrupt$cat_car == "(2,10]",],
+  aes(x = wbcode, y = violations)) +
+  geom_point(size = 1) + theme(axis.text.x=element_blank()) +
+  labs(x="Countries", y = "", title = "3 ~ 10") +
+  scale_y_continuous(limits = c(0,1000))
 
-## Presentation
+ten_plus <- ggplot(pre_corrupt[pre_corrupt$cat_car == "(10,120]",],
+  aes(x = wbcode, y = violations)) +
+  geom_point(size = 1) + theme(axis.text.x=element_blank()) +
+  labs(x="Countries", y = "", title = "more than 10") +
+  scale_y_continuous(limits = c(0,1000))
 
-During your week 4 live session, your team should present your analysis to the class.  Please limit your presentation to 15 minutes (10 minutes plus 5 minutes for questions).  You should use this presentation to highlight the process you followed in your EDA, as well as any aspects of your data that find particularly interesting.
+plot_grid(up_to_two,three_to_ten,ten_plus, ncol = 3, align = "hv")
+```
+One idea that could explain the lower amount of tickets issued for small missions is that UN might have a limited amount of parking spots and those may be sufficient for one or two cars.
 
+### Tickets per diplomat
+
+Another way to approach the dataset and minimize impact from the size of the missions in NY, is to normalize the number of tickets per personnel present in the city.
+```{r, warning=FALSE}
+pre_corrupt$esp_violations <- pre_corrupt$violations/(pre_corrupt$staff + pre_corrupt$spouse)
+plot(pre_corrupt$corruption, pre_corrupt$esp_violations, 
+     main = "Corruption vs Violations per capta", xlab = "Country Corruption Index", 
+     ylab = "Number of unpaid violations per mission member", 
+     col = alpha("black",0.5), pch = 16, alpha = 50)
+```
+With the plot we can see that the correlation is verified, although there are countries that, even with a positive corruption index, the unpaid parking tickets are still low when compared with their peers.
+
+### Analyzing the impact of the 2002 change in the previous analysis
+
+After verifying that the corruption index is positively correlated to the unpaid parking tickets in the previous section, we decided to apply the same analysis to the dataset after the license plates began to be confiscated. At a first sight, the correlation persist, but in a lower absolute number of violations. Where before we had a few countries with numbers around 1000, now we have up to 50 violations.
+
+```{r, warning=FALSE}
+plot(pos_corrupt$corruption, pos_corrupt$violations, 
+     main = "Corruption vs Violations (after 2002)", 
+     xlab = "Country Corruption Index", 
+     ylab = "Number of unpaid violations", 
+     col = alpha("dark green",0.5), pch = 16, alpha = 50)
+```
+
+The same applies to the per capta violations, where we had a maximum of 4 violations per capta against roughly 150 before.
+
+```{r, warning=FALSE}
+pos_corrupt$esp_violations <- pos_corrupt$violations/(pos_corrupt$staff + pos_corrupt$spouse)
+plot(pos_corrupt$corruption, pos_corrupt$esp_violations, 
+     main = "Corruption vs Violations per capta (after 2002)", 
+     xlab = "Country Corruption Index", 
+     ylab = "Number of unpaid violations per mission member", 
+     col = alpha("dark green",0.5), pch = 16, alpha = 50)
+```
+
+## Conclusion
+
+Having an overview of the dependent variables (violations) and the given questions (any relationship between corruption and parking violations), we do not see a clear linear relationship between each varibales. Perhaps, the results tell us there could be a different relationship other than linear between violations and corruption.
+
+Besides, we found the distribution of violations are skewed to the right and distribution of corruption are skewed to the left. Also, we know the vast majority of the unpaid violations happened under around 500. Unfortunately, when we look into the subset of the data, there still little or no relationship.
+what’s interesting is that we found fines have much stronger relationship with parking violations. This could suggest us that the fines varible could be instead the driver of violations. This can be our further studies.
+
+In addition, we also examine the trade variable. Again, trade varible does not seem to have much relationship with violations either. However, there might be some interesting interrelations with corruption index if we look at the trade levels that falls between our binning intervals of corruption. In the future, we may be able to model from there.
+
+The major contribution to diplomatic behavior is cultural norm and legal penalties don’t alter the behavior but only suppress the violations. The diplomats from Africa have the significant contribtions to the violations indicated by the Country corruption index between 0 and 1, and lower total trade with the United States. The amount of African diplomats is the most among diplomats from other regions.
+
+We may see some trend where higher corruption index correlates with higher amount of unpaid tickets. Small missions, with 2 or less cars compares to the others, we see that they tend to have less tickets. There are countries that, even with a positive corruption index, the unpaid parking tickets are still low when compared with their peers.
