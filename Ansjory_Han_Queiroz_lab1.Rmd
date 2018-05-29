@@ -13,7 +13,7 @@ This analysis is motivated by the following question:
 How is the amount of parking violations received by a UN diplomat related to the country corruption index?
 \end{center}
 
-Imagine that we have been hired by the World Bank to study the effect of cultural norms and legal enforcement in controlling corruption by analyzing the parking behavior of United Nations ocials in Manhattan. Until 2002, diplomatic immunity protected UN diplomats from parking enforcement actions, so diplomats actions were constrained by cultural norms alone. In 2002, enforcement authorities acquired the right to conscate diplomatic license plates of violators, after which diplomatic behavior was constrained by both cultural norms and the legal penalties of unpaid tickets. The World Bank would like to know what if any relationship there is between corruption and parking violations both pre and post 2002 and if there are any other relevant explanatory variables.
+Imagine that we have been hired by the World Bank to study the effect of cultural norms and legal enforcement in controlling corruption by analyzing the parking behavior of United Nations ocials in Manhattan. Until 2002, diplomatic immunity protected UN diplomats from parking enforcement actions, so diplomats actions were constrained by cultural norms alone. In 2002, enforcement authorities acquired the right to confiscate diplomatic license plates of violators, after which diplomatic behavior was constrained by both cultural norms and the legal penalties of unpaid tickets. The World Bank would like to know what if any relationship there is between corruption and parking violations both pre and post 2002 and if there are any other relevant explanatory variables.
 
 Cultural norms are unwritten yet well accepted behaviors that are established through years of society development. Different historic backgrounds and geographical particularities drive different set of standard behaviors and what is considered normal in one region, may be seen as unacceptable in a different area. However, when different cultures are invited to interact, we may have a rare opportunity to analyze the differences in a normalized environment. One good example of these opportunities happens at the United Nations (UN) office in New York, NY, USA, where diplomats from all major countries in the world interact not only on state interests, but also with more mundane tasks like having lunch, informal talks and even finding parking spots in Manhattan area. Maybe those day-to-day activities are even a better cultural indicator, since they have no bounds driven by commercial and/or diplomatic interests of one’s country. Encouraged by the World Bank, we analyzed data from parking violations made by UN diplomats in Manhattan area and compare two scenarios: pre and post 2002, when local enforcement authorities acquired the right to confiscate diplomatic license plates, forcing the diplomats to deal with not only the cultural norms they were used before, but also with legal penalties of unpaid tickets.
 
@@ -21,11 +21,12 @@ Cultural norms are unwritten yet well accepted behaviors that are established th
 
 Set up the working directory by putting data file and Rmd file in the same directory.
 ```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir='~/Documents/UC Berkeley MIDS/Summer 2018/DATASCI W203/Lab_1/Corruption_EDA')
+#knitr::opts_knit$set(root.dir='/Users/marceloqueiroz/Documents/Berkeley/Term2/W203/w203_lab1/Corruption_EDA')
+setwd('/Users/marceloqueiroz/Documents/Berkeley/Term2/W203/w203_lab1')
 ```
 
 Load all necessary libraries for the R functions.
-```{r}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 library(car)
 library("dplyr")
 library(scales)
@@ -39,7 +40,7 @@ load("Corrupt.RData")
 ```
 
 ## Data Validation and Selection
-The raw dataset consists of 'r nrow(FMcorrupt)' observations of 'r ncol(FMcorrupt)' variables that shows economic, cultural and geographical aspects of countries that attended UN meetings pre and post the 2002 law change. A glimpse of that data is shown below:
+The raw data-set consists of 368 observations of 28 variables that shows economic, cultural and geographical aspects of countries that attended UN meetings pre and post the 2002 law change. A glimpse of that data is shown below:
 
 ```{r, warning= FALSE}
 str(FMcorrupt)
@@ -85,7 +86,7 @@ However, provided that we want to answer the question __"How is the amount of pa
 corrupt <- FMcorrupt[!is.na(FMcorrupt$violations),]
 ```
 
-* Second we used the columns related to the geographical position to populate a new column, containing the name of the region for ploting purposes.
+* Second we used the columns related to the geographical position to populate a new column, containing the name of the region for plotting purposes.
   + Africa is region 6:
 ```{r}
 subcase_africa = corrupt$r_africa == 1 & !is.na(corrupt$r_africa)
@@ -135,7 +136,7 @@ reg_levels = c(1,2,3,4,5,6,7)
 corrupt$region_label <- factor(corrupt$region, levels = reg_levels, labels = reg_labels) 
 ```
 
-* Third we dropped columns that will not be usefull for our analisys, to 
+* Third we dropped columns that will not be useful for our analysis, to 
 ```{r}
 new_corrupt <- subset( corrupt, select = -c(mission, gov_wage_gdp, pctmuslim, 
                                             majoritymuslim, gdppcus1998, ecaid, 
@@ -144,7 +145,7 @@ new_corrupt <- subset( corrupt, select = -c(mission, gov_wage_gdp, pctmuslim,
                                             r_asia, distUNplz), drop = FALSE)
 ```
 
-When performing a last check in the data we found that some observation still miss their region, trade and number of cars. We fixed the region variable, while ignoring the tradee and car count since they may not be essencial for our analysis.
+When performing a last check in the data we found that some observation still miss their region, trade and number of cars. We fixed the region variable, while ignoring the trade and car count since they may not be essential for our analysis.
 ```{r}
 summary(new_corrupt)
 
@@ -186,7 +187,7 @@ region_label      | Region name
 
 ## Exploratory Analysis
 
-As stated before, in 2002 the New Youk authorities acquired the right to confiscate diplomatic license plates. Those plates are issued for diplomatic missions staff cars and for cars of personal use of the main diplomats and their families. Until 2002, therefore, the diplomats and their families where not required to pay for their traffic tickets, i.e., their only incentive for paying was the cultural norms of their society. However after 2002 an extra incentive was introduced, now a legal and economical one, which impacted the diplomatic community and their traffic habits. 
+As stated before, in 2002 the New York authorities acquired the right to confiscate diplomatic license plates. Those plates are issued for diplomatic missions staff cars and for cars of personal use of the main diplomats and their families. Until 2002, therefore, the diplomats and their families where not required to pay for their traffic tickets, i.e., their only incentive for paying was the cultural norms of their society. However after 2002 an extra incentive was introduced, now a legal and economical one, which impacted the diplomatic community and their traffic habits. 
 
 Before the enforcement of paying tickets a diplomatic mission had a median of 51.65 unpaid violations: 
 
@@ -201,13 +202,13 @@ summary(new_corrupt[new_corrupt$prepost == "pos",]$violations)
 pos_corrupt <- new_corrupt[new_corrupt$prepost == "pos",]
 ```
 
-This big difference can be easier noted with a barplot:
+This big difference can be easier noted with a bar-plot:
 ```{r}
 pp_corrupt <- arrange(new_corrupt, desc(new_corrupt$prepos))
 barplot(pp_corrupt$violations, col = "blue", ylim = c(0,500), main = "Unpaid NY parking violations (diplomatic plates)", border = NA, xpd = F, xlab = "time")
 ```
 
-We begin the scatterplot matrix. We want to get a high level overview. The general pattern between pre-2002 and post-2002 are very similar:
+We begin the scatter-plot matrix. We want to get a high level overview. The general pattern between pre-2002 and post-2002 are very similar:
 ```{r}
 scatterplotMatrix(~ violations + corruption + trade + region, 
                   data = pre_corrupt, 
@@ -222,7 +223,7 @@ scatterplotMatrix(~ violations + corruption + trade + region,
                   main = "Scatterplot Matrix for Key Variables")
 ```
 
-Violations is our dependent variable to look at. Interestingly, there seems little or no relationship between parking violations and corruption index. Rather, violations seems to have strong postive relationship with fines.
+Violations is our dependent variable to look at. Interestingly, there seems little or no relationship between parking violations and corruption index. Rather, violations seems to have strong positive relationship with fines.
 ```{r}
 cor(new_corrupt$violations, new_corrupt$corruption, use="complete.obs")
 cor(new_corrupt$violations, new_corrupt$fines, use="complete.obs")
@@ -233,14 +234,14 @@ Apart from looking at the violations, we notice the corruption index and trade m
 cor(new_corrupt$corruption, new_corrupt$trade, use="complete.obs")
 ```
 
-Overall, the plot suggests that violations and corruption may not really related. The fines variable is what we can dig further to see if it affects the bivariate relationships.
+Overall, the plot suggests that violations and corruption may not really related. The fines variable is what we can dig further to see if it affects the bi-variate relationships.
 Since our outcome variable is parking violations (violations). we summarize and create a histogram.
 ```{r}
 summary(new_corrupt$violations)
 hist(new_corrupt$violations, breaks="FD", main="Unpaid of Violations", xlab=NULL)
 ```
 
-Visually, the histogram shows to have a postive skew. The vast majority of the data is less than $500 unpaid.
+Visually, the histogram shows to have a positive skew. The vast majority of the data is less than $500 unpaid.
 
 ### Parking violations and corruption
 
@@ -248,14 +249,14 @@ It's easy to see that after the law enforcement all diplomats started paying the
 
 __"How is the amount of parking violations received by a UN diplomat related to the country corruption index?"__
 
-One of the available variables in our dataset was the corruption index for each country in 1998. We will consider that index is relatevelly stable through years and its analisys can be extended to the years after 2002. The corruption index is negative when a country have low corruption cases, and may be greater then 0 if a particular country have more corruption cases reported. To correlate that index with parking violations the first plot made was a scatterplot relating number of violations and corruption index:
+One of the available variables in our data-set was the corruption index for each country in 1998. We will consider that index is relatively stable through years and its analysis can be extended to the years after 2002. The corruption index is negative when a country have low corruption cases, and may be greater then 0 if a particular country have more corruption cases reported. To correlate that index with parking violations the first plot made was a scatter-plot relating number of violations and corruption index:
 ```{r, warning= FALSE}
 plot(pre_corrupt$corruption, pre_corrupt$violations, 
      main = "Corruption vs Violations (before 2002)", xlab = "Country Corruption Index", 
      ylab = "Number of unpaid violations", col = alpha("red",0.5), pch = 16, alpha = 50)
 ```
  
-This plot tells us that there is little or no linear relationship bettween violations and corruption variables. Earlier we also know the correlation between two is 0.078, which does not have much magnitude to show there is a linear relationship.
+This plot tells us that there is little or no linear relationship between violations and corruption variables. Earlier we also know the correlation between two is 0.078, which does not have much magnitude to show there is a linear relationship.
 ```{r}
  boxplot(violations ~ corruption, data = new_corrupt,
 main = "Unpaid Violation by Different Levels of Corruption", xlab = "Corruption", ylab = "Violation")
@@ -285,7 +286,7 @@ boxplot(violations ~ corruption_bin, data = new_corrupt, cex.axis = .7,
 main = "Unpaid Violations by Corruptive Attainment", ylab = "Unpaid Violations")
 ```
 
-The resulting boxplot shows the unpaid violations for each group. It could tells us different story. If we only look at unpaid violations under 500, the results might gives us more granular level of detailed relationship.
+The resulting box-plot shows the unpaid violations for each group. It could tells us different story. If we only look at unpaid violations under 500, the results might gives us more granular level of detailed relationship.
 ```{r}
 ### if we only look at unpaid violations under 500
 corruption_bin = cut(Sub2$corruption, breaks = c(-3,-1,1, Inf),
@@ -302,7 +303,7 @@ plot(sort(unique(new_corrupt$corruption)), trade_mean2, xlab = "corruption", yla
 main = "Mean Trade by Levels of Corruption")
 ```
 
-Similary, in the grpah, we don’t see a very clear relationship between trade and corruption. However, we could see most of the lower trade fall between the corruption index -1 and 1. Binning into three corruption intervals could help us understand more detailed.
+Similarly, in the graph, we don’t see a very clear relationship between trade and corruption. However, we could see most of the lower trade fall between the corruption index -1 and 1. Binning into three corruption intervals could help us understand more detailed.
 ```{r}
 corruption_bin = cut(new_corrupt$corruption, breaks = c(-3,-1,1, Inf),
 labels = c("Little or No Corruption", "Moderate Corruption", "High Corruption"))
@@ -334,7 +335,7 @@ As seen, most of the countries seems to lie on the lower part of the violations,
 * Countries with more diplomats may have more cars.
 * Countries with more cars assigned to their missions may have more tickets. 
 
-To test the first hypothesys we may see the distribution of total personnel vs number of cars.
+To test the first hypothesis we may see the distribution of total personnel vs number of cars.
 ```{r, warning=FALSE}
 plot(pre_corrupt$staff + pre_corrupt$spouse, 
      pre_corrupt$cars_mission + pre_corrupt$cars_personal, 
@@ -343,9 +344,9 @@ plot(pre_corrupt$staff + pre_corrupt$spouse,
      ylab = "Total Cars", col = alpha("blue",0.5), pch = 16, alpha = 50)
 ```
 
-It is clear that the correlation is true, and we can highlight the case of Russia, with 167 persons assigned to thei diplomatic mission somehow and 116 vehicles.
+It is clear that the correlation is true, and we can highlight the case of Russia, with 167 persons assigned to their diplomatic mission somehow and 116 vehicles.
 
-To test the second hypothesis we identified that more than 20% of the countries have either one or two cars. In order to improve visualization the total car count were tranformed in a new categorized variable.
+To test the second hypothesis we identified that more than 20% of the countries have either one or two cars. In order to improve visualization the total car count were transformed in a new categorized variable.
 ```{r}
 car_bins = seq(0,120, by = 2)
 y1 <- hist(pre_corrupt$cars_mission + pre_corrupt$cars_personal, 
@@ -387,7 +388,7 @@ One idea that could explain the lower amount of tickets issued for small mission
 
 ### Tickets per diplomat
 
-Another way to approach the dataset and minimize impact from the size of the missions in NY, is to normalize the number of tickets per personnel present in the city.
+Another way to approach the data-set and minimize impact from the size of the missions in NY, is to normalize the number of tickets per personnel present in the city.
 ```{r, warning=FALSE}
 pre_corrupt$esp_violations <- pre_corrupt$violations/(pre_corrupt$staff + pre_corrupt$spouse)
 plot(pre_corrupt$corruption, pre_corrupt$esp_violations, 
@@ -399,7 +400,7 @@ With the plot we can see that the correlation is verified, although there are co
 
 ### Analyzing the impact of the 2002 change in the previous analysis
 
-After verifying that the corruption index is positively correlated to the unpaid parking tickets in the previous section, we decided to apply the same analysis to the dataset after the license plates began to be confiscated. At a first sight, the correlation persist, but in a lower absolute number of violations. Where before we had a few countries with numbers around 1000, now we have up to 50 violations.
+After verifying that the corruption index is positively correlated to the unpaid parking tickets in the previous section, we decided to apply the same analysis to the data-set after the license plates began to be confiscated. At a first sight, the correlation persist, but in a lower absolute number of violations. Where before we had a few countries with numbers around 1000, now we have up to 50 violations.
 
 ```{r, warning=FALSE}
 plot(pos_corrupt$corruption, pos_corrupt$violations, 
@@ -422,13 +423,13 @@ plot(pos_corrupt$corruption, pos_corrupt$esp_violations,
 
 ## Conclusion
 
-Having an overview of the dependent variables (violations) and the given questions (any relationship between corruption and parking violations), we do not see a clear linear relationship between each varibales. Perhaps, the results tell us there could be a different relationship other than linear between violations and corruption.
+Having an overview of the dependent variables (violations) and the given questions (any relationship between corruption and parking violations), we do not see a clear linear relationship between each variables. Perhaps, the results tell us there could be a different relationship other than linear between violations and corruption.
 
 Besides, we found the distribution of violations are skewed to the right and distribution of corruption are skewed to the left. Also, we know the vast majority of the unpaid violations happened under around 500. Unfortunately, when we look into the subset of the data, there still little or no relationship.
-what’s interesting is that we found fines have much stronger relationship with parking violations. This could suggest us that the fines varible could be instead the driver of violations. This can be our further studies.
+what’s interesting is that we found fines have much stronger relationship with parking violations. This could suggest us that the fines variable could be instead the driver of violations. This can be our further studies.
 
-In addition, we also examine the trade variable. Again, trade varible does not seem to have much relationship with violations either. However, there might be some interesting interrelations with corruption index if we look at the trade levels that falls between our binning intervals of corruption. In the future, we may be able to model from there.
+In addition, we also examine the trade variable. Again, trade variable does not seem to have much relationship with violations either. However, there might be some interesting interrelations with corruption index if we look at the trade levels that falls between our binning intervals of corruption. In the future, we may be able to model from there.
 
-The major contribution to diplomatic behavior is cultural norm and legal penalties don’t alter the behavior but only suppress the violations. The diplomats from Africa have the significant contribtions to the violations indicated by the Country corruption index between 0 and 1, and lower total trade with the United States. The amount of African diplomats is the most among diplomats from other regions.
+The major contribution to diplomatic behavior is cultural norm and legal penalties don’t alter the behavior but only suppress the violations. The diplomats from Africa have the significant contributions to the violations indicated by the Country corruption index between 0 and 1, and lower total trade with the United States. The amount of African diplomats is the most among diplomats from other regions.
 
 We may see some trend where higher corruption index correlates with higher amount of unpaid tickets. Small missions, with 2 or less cars compares to the others, we see that they tend to have less tickets. There are countries that, even with a positive corruption index, the unpaid parking tickets are still low when compared with their peers.
