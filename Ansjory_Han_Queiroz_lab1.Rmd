@@ -21,8 +21,7 @@ Cultural norms are unwritten yet well accepted behaviors that are established th
 
 Set up the working directory by putting data file and Rmd file in the same directory.
 ```{r setup, include=FALSE}
-#knitr::opts_knit$set(root.dir='/Users/marceloqueiroz/Documents/Berkeley/Term2/W203/w203_lab1/Corruption_EDA')
-setwd('/Users/marceloqueiroz/Documents/Berkeley/Term2/W203/w203_lab1')
+knitr::opts_knit$set(root.dir='~/Documents/UC Berkeley MIDS/Summer 2018/DATASCI W203/Lab_1/Corruption_EDA')
 ```
 
 Load all necessary libraries for the R functions.
@@ -40,6 +39,7 @@ load("Corrupt.RData")
 ```
 
 ## Data Validation and Selection
+
 The raw data-set consists of 368 observations of 28 variables that shows economic, cultural and geographical aspects of countries that attended UN meetings pre and post the 2002 law change. A glimpse of that data is shown below:
 
 ```{r, warning= FALSE}
@@ -136,7 +136,7 @@ reg_levels = c(1,2,3,4,5,6,7)
 corrupt$region_label <- factor(corrupt$region, levels = reg_levels, labels = reg_labels) 
 ```
 
-* Third we dropped columns that will not be useful for our analysis, to 
+* Third we dropped columns that will not be useful for our analysis:
 ```{r}
 new_corrupt <- subset( corrupt, select = -c(mission, gov_wage_gdp, pctmuslim, 
                                             majoritymuslim, gdppcus1998, ecaid, 
@@ -155,7 +155,6 @@ new_corrupt["345", "region"] <- 6
 new_corrupt["346", "region"] <- 6
 new_corrupt["345", "region_label"] <- "Africa"
 new_corrupt["346", "region_label"] <- "Africa"
-
 ```
 
 As a final sanity test, each country must have exactly 2 observations, one before and one after the 2002 law enforcement. With a 298 observations data set that also must have exactly 149 observations for before and after 2002:
@@ -190,7 +189,6 @@ region_label      | Region name
 As stated before, in 2002 the New York authorities acquired the right to confiscate diplomatic license plates. Those plates are issued for diplomatic missions staff cars and for cars of personal use of the main diplomats and their families. Until 2002, therefore, the diplomats and their families where not required to pay for their traffic tickets, i.e., their only incentive for paying was the cultural norms of their society. However after 2002 an extra incentive was introduced, now a legal and economical one, which impacted the diplomatic community and their traffic habits. 
 
 Before the enforcement of paying tickets a diplomatic mission had a median of 51.65 unpaid violations: 
-
 ```{r}
 summary(new_corrupt[new_corrupt$prepost == "pre",]$violations)
 pre_corrupt <- new_corrupt[new_corrupt$prepost == "pre",]
@@ -205,10 +203,12 @@ pos_corrupt <- new_corrupt[new_corrupt$prepost == "pos",]
 This big difference can be easier noted with a bar-plot:
 ```{r}
 pp_corrupt <- arrange(new_corrupt, desc(new_corrupt$prepos))
-barplot(pp_corrupt$violations, col = "blue", ylim = c(0,500), main = "Unpaid NY parking violations (diplomatic plates)", border = NA, xpd = F, xlab = "time")
+barplot(pp_corrupt$violations, col = "blue", ylim = c(0,500),
+        main = "Unpaid NY parking violations (diplomatic plates)",
+        border = NA, xpd = F, xlab = "time")
 ```
 
-We begin the scatter-plot matrix. We want to get a high level overview. The general pattern between pre-2002 and post-2002 are very similar:
+We begin the scatter-plot matrix to get a high level overview. The general pattern between pre-2002 and post-2002 are very similar:
 ```{r}
 scatterplotMatrix(~ violations + corruption + trade + region, 
                   data = pre_corrupt, 
@@ -258,28 +258,31 @@ plot(pre_corrupt$corruption, pre_corrupt$violations,
  
 This plot tells us that there is little or no linear relationship between violations and corruption variables. Earlier we also know the correlation between two is 0.078, which does not have much magnitude to show there is a linear relationship.
 ```{r}
- boxplot(violations ~ corruption, data = new_corrupt,
-main = "Unpaid Violation by Different Levels of Corruption", xlab = "Corruption", ylab = "Violation")
+boxplot(violations ~ corruption, data = new_corrupt,
+        main = "Unpaid Violation by Different Levels of Corruption",
+        xlab = "Corruption", ylab = "Violation")
 ```
  
 The relationship does not appear linear and too much noises. We noticed that the majority of violations is under 500. We want to see what happen if only looking at violations under 500.
 ```{r}
-Sub2<-subset(new_corrupt, new_corrupt$violations<=500)
-boxplot(violations ~ corruption, data = Sub2,
-main = "Unpaid Violation by Different Levels of Corruption", varwidth=TRUE,
-xlab = "Corruption", ylab = "Violation")
+sub2<-subset(new_corrupt, new_corrupt$violations<=500)
+boxplot(violations ~ corruption, data = sub2,
+        main = "Unpaid Violation by Different Levels of Corruption",
+        varwidth=TRUE,
+        xlab = "Corruption", ylab = "Violation")
 ```
  
 If we only look at violations under 500, the results still look little or no linear relationship.
 ```{r}
 violations_mean<-by(new_corrupt$violations, new_corrupt$corruption, mean, na.rm=T)
-plot(sort(unique(new_corrupt$corruption)), violations_mean, xlab = "corruption", ylab = "violations",
-main = "Mean of Unpaid Violations by Levels of Corruption")
+plot(sort(unique(new_corrupt$corruption)), violations_mean,
+     xlab = "corruption", ylab = "violations",
+     main = "Mean of Unpaid Violations by Levels of Corruption")
 ```
 
 We plot the mean of violations for each levels of corruption for better assess the relationship. Violation above around 500 might be deemed as outliers. Also, the corruption index between -1 and 1 contain more unpaid violations. To focus our attention on levels of corruption, we might speculate and want to bin our corruption variable into intervals.
 ```{r}
- corruption_bin = cut(new_corrupt$corruption, breaks = c(-3,-1,1, Inf),
+corruption_bin = cut(new_corrupt$corruption, breaks = c(-3,-1,1, Inf),
 labels = c("Little or No Corruption", "Moderate Corruption", "High Corruption"))
 summary(corruption_bin)
 boxplot(violations ~ corruption_bin, data = new_corrupt, cex.axis = .7,
@@ -289,9 +292,9 @@ main = "Unpaid Violations by Corruptive Attainment", ylab = "Unpaid Violations")
 The resulting box-plot shows the unpaid violations for each group. It could tells us different story. If we only look at unpaid violations under 500, the results might gives us more granular level of detailed relationship.
 ```{r}
 ### if we only look at unpaid violations under 500
-corruption_bin = cut(Sub2$corruption, breaks = c(-3,-1,1, Inf),
+corruption_bin = cut(sub2$corruption, breaks = c(-3,-1,1, Inf),
 labels = c("Little or No Corruption", "Moderate Corruption", "High Corruption"))
-boxplot(violations ~ corruption_bin, data = Sub2, cex.axis = .7,
+boxplot(violations ~ corruption_bin, data = sub2, cex.axis = .7,
 main = "Unpaid Violations by Corruptive Attainment", ylab = "Unpaid Violations")
 ```
 
@@ -299,8 +302,9 @@ main = "Unpaid Violations by Corruptive Attainment", ylab = "Unpaid Violations")
 
 ```{r}
 trade_mean2<-by(new_corrupt$trade, new_corrupt$corruption, mean, na.rm=T)
-plot(sort(unique(new_corrupt$corruption)), trade_mean2, xlab = "corruption", ylab = "trade",
-main = "Mean Trade by Levels of Corruption")
+plot(sort(unique(new_corrupt$corruption)), trade_mean2,
+     xlab = "corruption", ylab = "trade",
+     main = "Mean Trade by Levels of Corruption")
 ```
 
 Similarly, in the graph, we don’t see a very clear relationship between trade and corruption. However, we could see most of the lower trade fall between the corruption index -1 and 1. Binning into three corruption intervals could help us understand more detailed.
@@ -312,8 +316,8 @@ main = "Number of Trade with US by Corruptive Attainment", ylab = "Trade with US
 ```
 
 ### Region and corruption
-Now, trying to plot the corruptions against each region. Region 6 (Africa) has the most distribution of corruptions 4
-between 0 and 1.
+
+Now, trying to plot the corruptions against each region. Region 6 (Africa) has the most distribution of corruptions between 0 and 1.
 ```{r}
 plot(new_corrupt$region, new_corrupt$corruption, xlab = "region", ylab = "corruputions")
 ```
@@ -355,8 +359,7 @@ y1 <- hist(pre_corrupt$cars_mission + pre_corrupt$cars_personal,
 axis(1, at = seq(0,20, by = 2))
 axis(2)
 
-pre_corrupt$cat_car <- cut(pre_corrupt$cars_personal + pre_corrupt$cars_mission,
-                           c(0,2,10,120))
+pre_corrupt$cat_car <- cut(pre_corrupt$cars_personal + pre_corrupt$cars_mission, c(0,2,10,120))
 barplot(table(pre_corrupt$cat_car),col = "light blue",
         main = "Count of total cars by categories", 
         ylim = c(0,80), ylab = "count", xlab = "bins")
@@ -426,7 +429,8 @@ plot(pos_corrupt$corruption, pos_corrupt$esp_violations,
 Having an overview of the dependent variables (violations) and the given questions (any relationship between corruption and parking violations), we do not see a clear linear relationship between each variables. Perhaps, the results tell us there could be a different relationship other than linear between violations and corruption.
 
 Besides, we found the distribution of violations are skewed to the right and distribution of corruption are skewed to the left. Also, we know the vast majority of the unpaid violations happened under around 500. Unfortunately, when we look into the subset of the data, there still little or no relationship.
-what’s interesting is that we found fines have much stronger relationship with parking violations. This could suggest us that the fines variable could be instead the driver of violations. This can be our further studies.
+
+What’s interesting is that we found fines have much stronger relationship with parking violations. This could suggest us that the fines variable could be instead the driver of violations. This can be our further studies.
 
 In addition, we also examine the trade variable. Again, trade variable does not seem to have much relationship with violations either. However, there might be some interesting interrelations with corruption index if we look at the trade levels that falls between our binning intervals of corruption. In the future, we may be able to model from there.
 
