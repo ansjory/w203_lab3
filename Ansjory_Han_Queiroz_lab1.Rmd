@@ -210,14 +210,14 @@ barplot(pp_corrupt$violations, col = "blue", ylim = c(0,500),
 
 We begin the scatter-plot matrix to get a high level overview. The general pattern between pre-2002 and post-2002 are very similar:
 ```{r}
-scatterplotMatrix(~ violations + corruption + trade + region, 
+scatterplotMatrix(~ violations + corruption + fines + trade + region, 
                   data = pre_corrupt, 
                   diagonal=list(method="histogram", breaks="FD"),
                   main = "Scatterplot Matrix for Key Variables")
 ```
 
 ```{r}
-scatterplotMatrix(~ violations + corruption + trade + region, 
+scatterplotMatrix(~ violations + corruption + fines + trade + region, 
                   data = pos_corrupt, 
                   diagonal=list(method="histogram", breaks="FD"),
                   main = "Scatterplot Matrix for Key Variables")
