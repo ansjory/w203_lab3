@@ -12,25 +12,28 @@ The motivation of this analysis is to understand the determinants of crime and t
 
 ## The Initial EDA
 
-Set up the working directory by putting data file and Rmd file in the same directory.
 ```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir='~/Documents/UC Berkeley MIDS/Summer 2018/DATASCI W203/Lab_3')
+# Set up the working directory by putting data file and Rmd file in the same directory:
+knitr::opts_knit$set(root.dir='/Users/marceloqueiroz/Documents/Berkeley/Term2/w203/w203_lab3')
 ```
 
-Load all necessary libraries for the R functions.
+For this analisys, the team decided to add the car library, for scatterplot matrix comparation and the stargazer library, for improved analysis of linear models:
 ```{r}
 library(car)
 library(stargazer)
 ```
 
-Load the cross-section data set into R and inspect it. 
+Load the cross-section data set into R and inspect it:
 ```{r}
 Data <- read.csv("crime_v2.csv", header=TRUE, sep=",")
-str(Data)
 summary(Data)
 ```
+As we saw, the data consists of 97 observations of 25 variables, where 6 of them seems consistently missing. To make sure, we can perform:
+```{r}
+Data[is.na(Data$county),]
+```
 
-Perform the following cleanse of data:
+From the summary we also noticed that $prbconv$ was a factor variable, and some of the variables that were supposed to be probabilities were actually greater than 1, therefore clearly wrong. In order to fix the problems exposed, we did the following:
 
 * Convert $prbconv$ from factor to numeric.
 
@@ -38,59 +41,169 @@ Perform the following cleanse of data:
 
 * Eliminate probability values greater than 1 from $prbarr$, 
 $prbconv$, $prbpris$.
+
 ```{r warning=FALSE}
 Data$prbconv = as.numeric(paste(Data$prbconv))
 subcases = !is.na(Data$county) & !Data$prbarr>1 & !Data$prbconv>1 & !Data$prbpris>1
 crime_data = Data[subcases, ]
-str(crime_data)
-summary(crime_data)
 ```
 
-Now, the new data frame has 81 observations. Crimes committed per person $crmrte$ is what we want to measure. We break the variables into 3 groups to examine the relationship against crime rate.
+Now, the new data frame has 81 observations which can be assessed to improve our employer policies proposal's for North Caroline. The available variable's descriptions are:
 
-First scatterplot matrix is crime rate with variables related to the nature of crime: probabilities of arrest, conviction and prison sentence, average sentence days, and log transformation of offense mix. 
+variable      | label
+--------------|-----------
+year          | 1987
+crmrte        | crimes committed per person
+prbarr        |‘probability’ of arrest
+prbconv       |‘probability’ of conviction
+prbpris       |‘probability’ of prison sentence
+avgsen        |avg. sentence, days
+polpc         |police per capita
+density       |people per sq. mile
+taxpc         |tax revenue per capita
+west          | =1 if in western N.C.
+central       | =1 if in central N.C.
+urban         | =1 if in SMSA
+pctmin80      | perc. minority, 1980
+wcon          | weekly wage, construction
+wtuc          | wkly wge, trns, util, commun
+wtrd          | wkly wge, whlesle, retail trade
+wfir          | wkly wge, fin, ins, real est
+wser          | wkly wge, service industry
+wmfg          | wkly wge, manufacturing
+wfed          | wkly wge, fed employees
+wsta          | wkly wge, state employees
+wloc          | wkly wge, local gov emps
+mix           | offense mix: face-to-face/other
+pctymle       | percent young male
 
-Here are some features noticed from the matrix:
+As our employer is interested on public policies that could address the crime problem, our dependent value will be $crmrte$, or crimes commited per person. Additionally, as analizing 25 variables would be inneficient, we decided to divide our analysis in 3 steps, with the variables grouped by their nature. That said, we will have a group of variables that looks for models that explains how convictions and police enforcement explains crime rates, a separate group that looks for models that explains how etno-geographic data influences crime rates and a last one, that covers variations in wages and industries differences.
 
-* There are noticable negative relationship between crime rate and probability of arrest, crime rate and probability of conviction.
+This division may be useful for figuring out the variables that may be used for a final model later, more robust and contemplating all kinds of variables. Also this was choosen in order to make the campaign decision making process easier, since policies usually have well defined areas of impact, such as housing, employment, police forces, etc.
+
+### Crime and Law Enforcement
+
+As stated previously, the first model we want to develop is related to variables that are reflex of law enforcement policies:
+
+variable      | label
+--------------|-----------
+crmrte        | crimes committed per person (Dependent Variable - DV)
+prbarr        | ‘probability’ of arrest
+prbconv       | ‘probability’ of conviction
+prbpris       | ‘probability’ of prison sentence
+avgsen        | avg. sentence, days
+polpc         | police per capita
+mix           | offense mix: face-to-face/other
+
+
+For a first anlisys, we did a scatterplot matrix is crime rate with variables related to the nature of crime: probabilities of arrest, conviction and prison sentence, average sentence days, and log transformation of offense mix. 
+
+```{r}
+scatterplotMatrix(~ (crmrte) + (prbarr) + (prbconv) + (prbpris) + (avgsen) + (polpc) + (mix), 
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Nature of Crime")
+```
+
+Observing the first column in the matrix, we noticed that the offense mix variable have higher spread over lower values of crime per capta and also a positevely skewed distribution, so it was decided to perform a log tranformation on that variable.
+
+Additionally some realationship identified that are not necessarily related to our dependent variable, crime per capta, but may be useful to note for further consideration:
 
 * There is strong positive relationship between probability of arrest and offense mix.
 
 * Probability of prison sentence and average sentence days do not seem to have a strong relationship with any other variables in this group.
 
+For an improved visualization, we dropped the variables that were hardly correlated to our DV and reploted the scatterplot matrix:
+
 ```{r}
-scatterplotMatrix(~ crmrte + prbarr + prbconv + prbpris + avgsen + log(mix), 
+scatterplotMatrix(~ crmrte + prbarr + prbconv + polpc + log(mix), 
                   data = crime_data,
-                  main = "Scatterplot Matrix for Variables of Nature of Crime")
+                  main = "Scatterplot Matrix for Variables of Nature of Crime - Transformed")
 ```
 
-Second scatterplot matrix is crime rate with variables related to population: police per capita, people per square mile, % minority, and log transformation of % young male.
+* There are noticable negative relationship between crime rate and probability of arrest, crime rate and probability of conviction.
 
-Here are some features noticed from the matrix:
+* More police officers per capta seems to be correlated to more crimes per capta. Although this fact seems couter-intuitive, we remember this is not a causal analisys, and more police on the streets may be an effect of a higher crime rate, not the opposite (as one could erroneously infer).
 
-* There are noticable positive relationship between crime rate and police per capita, crime rate and people per sq. mi., % young male and crime rate.
+* The mix of face-to-face offences related to other seems to have a lower negative relationships, but still requires further inivestigation.
 
-* Positive relationship between crime rate and police per capita seems to be an anomaly since crime rate is supposed to go down if there is more police per capita. Therefore, $polpc$ could be a top-coded variable with data not reflected with appropriate variable name.
+### Crime and Etno-geographical variables:
 
-* % minority does not seem to have a strong relationship with any other variables in this group.
+Second scatterplot matrix is crime rate with variables related to population and geographical (excluding the binary variables): 
+
+Label         | Description
+--------------|------------------
+density       | people per sq. mile
+pctmin80      | perc. minority, 1980
+pctymle       | percent young male
+
+The same scatterplot matris analisys gave us:
 
 ```{r}
-scatterplotMatrix(~ crmrte + polpc + density + pctmin80 + log(pctymle), 
+scatterplotMatrix(~ (crmrte) + (density) + (pctmin80) + (pctymle), 
                   data = crime_data,
                   main = "Scatterplot Matrix for Variables of Population")
 ```
 
-Third scatterplot matrix is crime rate with variables related to wages: tax revenue per capita, weekly wages of 6 different industries, and wages of federal, state, and local employees.
+As once again the data seemed positevely skewed for pctymle and density variables, and we did a log tranformation. Also, as the percentage of minority does not seem to affect any of the other variables, this variable was dropped for this analisys (although this may be an important output of this research as well).
 
-Here are some features noticed from the matrix:
+The new scatterplot matrix was:
 
-* There are strong relationship between crime rate and all variables in this group.
+```{r}
+scatterplotMatrix(~ crmrte + log(density) + log(pctymle), 
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Population Transformed")
+```
+
+Here is a features noticed from the matrix:
+
+* There are noticable positive relationship between crime rate and people per sq. mi., and % young male (although the latter is still positevely skewed).
+
+
+### Crime and wage:
+
+For the wage related variables, the folowing were used:
+
+Label         | Description
+--------------|------------------
+taxpc         | tax revenue per capita
+wcon          | weekly wage, construction
+wtuc          | wkly wge, trns, util, commun
+wtrd          | wkly wge, whlesle, retail trade
+wfir          | wkly wge, fin, ins, real est
+wser          | wkly wge, service industry
+wmfg          | wkly wge, manufacturing
+wfed          | wkly wge, fed employees
+wsta          | wkly wge, state employees
+wloc          | wkly wge, local gov emps
+
+The usual scatterplot matrix was:
 
 ```{r}
 scatterplotMatrix(~ crmrte + taxpc + wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc,
                   data = crime_data,
                   main = "Scatterplot Matrix for Variables of Wages" )
 ```
+
+As it seems to exists a positive relationship between wages in all studied industries and crime rates, we decided to summerize those variables into 3 more intuitive ones:
+
+Label         | Description
+--------------|------------------
+taxpc         | tax revenue per capita
+wblue         | wcon + wtuc + wmfg = average Blue-collar professionals
+wwhite        | wtrd + wfir + wser = average White-collar professionals
+wgov          | wfed + wsta + wloc = average Government professional
+
+```{r}
+crime_data$wblue <- (crime_data$wcon + crime_data$wtuc + crime_data$wmfg)/3
+crime_data$wwhite <- (crime_data$wtrd + crime_data$wfir + crime_data$wser)/3
+crime_data$wgov <- (crime_data$wfed + crime_data$wsta + crime_data$wloc)/3
+
+scatterplotMatrix(~ (crmrte) + (taxpc) + (wblue) + (wwhite) + (wgov),
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Wages - Transformed" )
+```
+
+Again, we can see the correlations seems positive, indicating that higher wages are related to higher crime rates, which seems counter intuitive again, which reminds us that there are no causation realationships here. This maybe addressed on further developments if this study.
 
 One last observation is central N.C. tends to have higher frequency of crime rates than west N.C. and SMSA.
 
