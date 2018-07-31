@@ -8,42 +8,53 @@ header-includes:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_knit$set(root.dir='~/Documents/UC Berkeley MIDS/Summer 2018/DATASCI W203/Lab_3')
+knitr::opts_knit$set(echo = TRUE)
 ```
 
 ## Peer Feedback for Group 5
 
-1. Introductions
+## 1. Introductions
 
-The motivation of this report is clearly stated and easy to understand. The introduction of face-to-face crime rate comes with an interesting perspective through formula derivation from \texttt{mix} variable.
+The motivation of this report is clearly stated and easy to understand. However they are found throughout the report. It would be interesting to have an introductory/context paragraph. The introduction of face-to-face crime rate comes with an interesting perspective through formula derivation from \texttt{mix} variable.
 
-2. The Initial EDA
+Points that were well explained and could be part of your introduction:
 
-The transformations of variables could be part of the initial or subsequent portion of the EDA analysis. Any particular reason to call the combined wage variable as \texttt{wave} instead of \texttt{wage}? Did a sample mean without considering their weight composition may reduce influence of certain variables.
+ * The two variables of interest and the assumption that made you transform `crmrte` and `mix` into a new variable (this was a really powerful insight, by the way).
+ * The focus on findings that can affect change without unintended consequences.
+ * The worry about not proposing experiments that are unethical.
+ * The point on adding the percentage of workers in each industry is really good, looking forward to see if this can be done on out timeframe.
 
-There are anomalous values identified but no further action is performed to have them adjusted or removed for EDA. There is no further analysis of each variable to see if further transformation is needed to expose linear relationships in scatterplots.
+## 2. The Initial EDA
 
-The scatterplots are a bit too small and busy to see the correlation. It is true that covariates may have casual effects, but they are more inspected for correlation rather than casual effect.
+The transformations of variables could be part of the initial or subsequent portion of the EDA analysis. Any particular reason to call the combined wage variable as \texttt{wave} instead of \texttt{wage}? Did a sample mean without considering their weight composition may reduce influence of certain variables?
 
-3. The Model Building Process
+There are anomalous values identified but no further action is performed to have them adjusted or removed for EDA. Possible improvement for the last part: clearly state if the observations in section 3 resulted in data removing and why (or why not). Additionally, there is space for further analysis of each variable to see if further transformation is needed to expose linear relationships in scatterplots.
 
-There is no explanation behind how the 3 models being come up with and related to the EDA. There are side-by-side comparisons on both outcome variables \texttt{crmrte} and \texttt{fcrmrte} with same 3 models for each. There is not enough explanation to understand the meaning through visualization.
+The scatterplots are a bit too small and busy to see the correlation. It is true that covariates may have casual effects, but they are more inspected for correlation rather than casual effect. Maybe a plot for each of the points raised in section 4 could help the reader to visualize your statements.
 
-4. The Regression Table
+## 3. The Model Building Process
 
-More explanations are needed on how the model specifications are properly chosen to outline the boundary of reasonable choices. However, it is easy to find key coefficients in the regression table, but there is no further discussion of practical significance for key effects.
+ALthough the six models came from reasonable assumptions and the tranformations made a lot of sense, there is no explanation behind how the 3 models being come up with and related to the EDA. Some discussions of why the variables were choosen may help.
 
-5. The Omitted Variables Discussion
+There are side-by-side comparisons on both outcome variables \texttt{crmrte} and \texttt{fcrmrte} with same 3 models for each. There is not enough explanation to understand the meaning through visualization. You can add this discussion either here or after the tables.
 
-No discussion on omitted variables.
+## 4. The Regression Table
 
-6. Conclusion
+More explanations are needed on how the model specifications are properly chosen to outline the boundary of reasonable choices. However, it is easy to find key coefficients in the regression table, but there is no further discussion of practical significance for key effects. Some discussion when comparing the three models for each variable may be needed to help the reader on where to look. Also we would like to see comments on the $AIC/R^2$ relationship when we add more variables.
 
-The conclusion addresses the big-picture concerns about the political campaign in a qualitative manner. Interesting points are identified on police per capita against crime rate.
+## 5. The Omitted Variables Discussion
 
-7. Throughout the Report
+Did not see a section addressing this problem. I believe with the discussion around the regression tables and their similarities and differences can drive some insights on that.
+
+## 6. Conclusion
+
+The conclusion addresses the big-picture concerns about the political campaign in a qualitative manner. Interesting points are identified on police per capita against crime rate. A good point to add here is some discussion about the statistical vs the practical outcomes of our studies, since the coefficients are really low.
+
+## 7. Throughout the Report
 
 No significant errors, faulty logic, or unpersuasive writing that leads to less convincing conclusions. 
+
+Overall yout report is clean and direct, with a lot of good insights. Most of our ideas in this peer review are related to add more narrative sections making the reading easier for people with no statistics background as well.
 
 Following attaches report of Group 5 Lab 3 Part 1.
 
