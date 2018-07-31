@@ -27,4 +27,4 @@ Part 2
 
 Part 3
 ------
-1. Ansjory_Han_Queiroz_Lab3Part1_Reviewed_by_Group3.pdf is our report reviewed by Group 3 with inline comments.
+1. Ansjory_Han_Queiroz_Lab3Part1_reviewed_by_Group3.pdf is our report reviewed by Group 3 with inline comments.
