@@ -23,3 +23,8 @@ Part 2
 2. Ansjory_Han_Queiroz_Lab3Part2.Rmd is the peer feedback R source file for Part 2.
 
 3. Ansjory_Han_Queiroz_Lab3Part2.pdf is the R Markdown peer feedback report for Part 2.
+
+
+Part 3
+------
+1. Ansjory_Han_Queiroz_Lab3Part1_Reviewed_by_Group3.pdf is our report reviewed by Group 3 with inline comments.
