@@ -1,0 +1,39 @@
+---
+title: 'Lab 3: Reducing Crime Peer review'
+author: 'Group 4: Chi Iong Ansjory, Tsung-Chin Han, Marcelo Queiroz'
+date: "7/30/2018"
+output: pdf_document
+---
+
+## Introduction
+
+We missed a clear introduction part as stated in Stage 2 section of the Lab 3 assignment. The motivation for the study, the tranformations that were derived from that motivation and the major assumptions are really consistent but are spreaded throughout the report. We believe that inserting an introductory paragraph with the motivation of the study and it's context would make the report easier for an outsider reader.
+
+Points that were well explained and could be part of your introduction:
+* The two variables of interest and the assumption that made you transform `crmrte` and `mix` into a new variable (this was a really powerful insight, by the way).
+* The focus on findings that can affect change without unintended consequences.
+* The worry about not proposing experiments that are unethical.
+* The point on adding the percentage of workers in each industry is really good, looking forward to see if this can be done on out timeframe.
+
+## The initial EDA
+
+Well done step. The data cleaning and the tranformations were well explained when not obvious and possible problems in the variables noted. Possible improvement for the last part: celarly state if the observations in section 3 resulted in data removing and why (or why not).
+The `pairs` matrix was a good starting point, however a little difficult to visualize. Maybe a plot for each of the points raised in section 4 could help the reader to visualize your statements.
+
+## The Model Building Process
+
+The six models came from reasonable assumptions and the tranformations made a lot of sense. Some possible improvement would be to address the skew mentioned in some variables. 
+
+## The regression table
+
+Very usefull table, however some discussion when comparing the three models for each variable may be needed to help the reader on where to look. I would like to see especially comments on the $AIC/R^2$ relationship when we add more variables.
+
+## The ommited ariables Assumption
+
+Did not see a section addressing this problem. I believe with the discussion around the regression tables and their similarities and differences can drive some insights on that.
+
+## Conclusion.
+
+Really good closure and clear on the recommendations on the judicial system. A good point to add here is some discussion about the statistical vs the practical outcomes of our studies, since the coefficients are really low.
+
+Overall yout report is clean and direct, with a lot of good insights. Most of our ideas in this peer review are related to add more narrative sections making the reading easier for people with no statistics background as well.

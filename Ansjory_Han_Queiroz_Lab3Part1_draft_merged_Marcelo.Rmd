@@ -46,6 +46,7 @@ $prbconv$, $prbpris$.
 Data$prbconv = as.numeric(paste(Data$prbconv))
 subcases = !is.na(Data$county) & !Data$prbarr>1 & !Data$prbconv>1 & !Data$prbpris>1
 crime_data = Data[subcases, ]
+
 ```
 
 Now, the new data frame has 81 observations which can be assessed to improve our employer policies proposal's for North Caroline. The available variable's descriptions are:
@@ -97,6 +98,87 @@ mix           | offense mix: face-to-face/other
 
 
 For a first anlisys, we did a scatterplot matrix is crime rate with variables related to the nature of crime: probabilities of arrest, conviction and prison sentence, average sentence days, and log transformation of offense mix. 
+=======
+str(crime_data)
+names(crime_data)
+summary(crime_data)
+```
+
+Now, the new data frame has 81 observations. First of all, our goal is to understand the determinants of crime, crimes committed per person $crmrte$ is more direct as to what we want to measure. Therefore, our dependent variable will be $crmte$ (%). Let's first look at the un-transformed type.
+```{r}
+summary(crime_data$crmrte)
+hist(crime_data$crmrte,
+     col="light blue",
+     xlab="Crime Rate", ylim=c(0,30),
+     main="Histogram of Crime Rate")
+
+# to better understand the skewness distribution and it's spread graphically
+par(mfrow=c(1,2))
+hist(crime_data$crmrte, xlab="",
+     col="light blue",
+     main="Histogram of Crime Rate", ylim=c(0,30))
+lines(density(crime_data$crmrte, na.rm=T),
+      col="dark red")
+rug(jitter(crime_data$crmrte))
+qqnorm(crime_data$crmrte, main="QQ Plot of Crime Rate")
+par(mfrow=c(1,1))
+
+# boxplot
+boxplot(crime_data$crmrte, ylab="Crime Rate")
+rug(jitter(crime_data$crmrte), side=2)
+abline(h=mean(crime_data$crmrte, na.rm=T), lty=2)
+```
+
+The crime rate has right skew with the mean at 0.033, and median at 0.030. The distribution is not normally distibuted. The box plot also shows more possible outliers have distorted the value of the mean as a statistic of centrality. Also, the variable $crmrte$ has a distribution of the observed values concentrated on low values, thus with a positive skew.
+
+One last observation is central N.C. tends to have higher frequency of crime rates than west N.C. and SMSA.
+
+```{r}
+hist(crime_data[crime_data$central == 1, ]$crmrte,
+     col="light blue",
+     main="Histogram of Crime Rate in Central N.C.",
+     xlab="Crime Rate", ylim=c(0,30))
+```
+
+Now, let's see if we apply log transformation on the dependent variable $crmrte$.
+```{r}
+summary(log(crime_data$crmrte))
+hist(log(crime_data$crmrte),
+     col="light blue",
+     xlab="Logarithm of Crime Rate", ylim=c(0,30),
+     main="Histogram of Logarithm of Crime Rate")
+
+# to better understand the skewness distribution and it's spread graphically
+par(mfrow=c(1,2))
+hist(log(crime_data$crmrte), xlab="",
+     col="light blue",
+     main="Histogram of Logarithm of Crime Rate", ylim=c(0,30))
+lines(density(log(crime_data$crmrte), na.rm=T),
+      col="dark red")
+rug(jitter(log(crime_data$crmrte)))
+qqnorm(log(crime_data$crmrte), main="QQ Plot of Crime Rate")
+par(mfrow=c(1,1))
+
+# boxplot
+boxplot(log(crime_data$crmrte), ylab="Crime Rate")
+rug(jitter(log(crime_data$crmrte)), side=2)
+abline(h=mean(log(crime_data$crmrte), na.rm=T), lty=2)
+```
+
+Clearly, if we apply log transformation on crime rate, our distribution becomes normally distibuted with mean and median to be very close, almost no skew and symmetric. This log transformed crime rate could be more ideal when it comes to modelling for OLS.
+
+We break the variables into 3 groups to examine the relationship against crime rate.
+
+First group is crime-related variables: $prbarr, prbconv, prbpris, avgsen, mix$. Inspecting histograms of each variable and $mix$ needs to be log transformed.
+```{r}
+par(mfrow=c(1,5))
+hist(crime_data$prbarr) # close to normal
+hist(crime_data$prbconv) # close to normal
+hist(crime_data$prbpris) # close to normal
+hist(crime_data$avgsen) # close to normal
+hist(log(crime_data$mix)) # close to normal
+```
+
 
 ```{r}
 scatterplotMatrix(~ (crmrte) + (prbarr) + (prbconv) + (prbpris) + (avgsen) + (polpc) + (mix), 
@@ -115,9 +197,28 @@ Additionally some realationship identified that are not necessarily related to o
 For an improved visualization, we dropped the variables that were hardly correlated to our DV and reploted the scatterplot matrix:
 
 ```{r}
+
 scatterplotMatrix(~ crmrte + prbarr + prbconv + polpc + log(mix), 
                   data = crime_data,
                   main = "Scatterplot Matrix for Variables of Nature of Crime - Transformed")
+
+scatterplotMatrix(~ log(crmrte) + prbarr + prbconv + prbpris + avgsen + log(mix), 
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Nature of Crime")
+cor(log(crime_data$crmrte), crime_data$prbarr,
+    use="complete.obs")
+cor(log(crime_data$crmrte), crime_data$prbconv,
+    use="complete.obs")
+```
+
+Second group is population-related variables: $polpc, density, pctmin80, pctymle$. Inspecting histograms of each variable and $pctymle$ needs to be log transformed.
+```{r}
+par(mfrow=c(1,4))
+hist(crime_data$polpc) # close to normal
+hist(crime_data$density) # right skew
+hist(crime_data$pctmin80) # close to normal
+hist(log(crime_data$pctymle)) # right skew
+
 ```
 
 * There are noticable negative relationship between crime rate and probability of arrest, crime rate and probability of conviction.
@@ -142,6 +243,24 @@ The same scatterplot matris analisys gave us:
 scatterplotMatrix(~ (crmrte) + (density) + (pctmin80) + (pctymle), 
                   data = crime_data,
                   main = "Scatterplot Matrix for Variables of Population")
+cor(log(crime_data$crmrte), crime_data$density,
+    use="complete.obs")
+```
+
+Third group is economy-related variables: $taxpc, wcon, wtuc, wtrd, wfir, wser, wmfg, wfed, wsta, wtoc$. Inspecting histograms of each variable.
+```{r}
+par(mfrow=c(1,5))
+hist(crime_data$taxpc) # right skew
+hist(crime_data$wcon) # close to normal
+hist(crime_data$wtuc) # close to normal
+hist(crime_data$wtrd) # close to normal
+hist(crime_data$wfir) # close to normal
+par(mfrow=c(1,5))
+hist(crime_data$wser) # close to normal
+hist(crime_data$wmfg) # close to normal
+hist(crime_data$wfed) # close to normal
+hist(crime_data$wsta) # close to normal
+hist(crime_data$wloc) # close to normal
 ```
 
 As once again the data seemed positevely skewed for pctymle and density variables, and we did a log tranformation. Also, as the percentage of minority does not seem to affect any of the other variables, this variable was dropped for this analisys (although this may be an important output of this research as well).
@@ -182,8 +301,15 @@ The usual scatterplot matrix was:
 scatterplotMatrix(~ crmrte + taxpc + wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc,
                   data = crime_data,
                   main = "Scatterplot Matrix for Variables of Wages" )
+cor(log(crime_data$crmrte), crime_data$wcon,
+    use="complete.obs")
+cor(log(crime_data$crmrte), crime_data$wtrd,
+    use="complete.obs")
+cor(log(crime_data$crmrte), crime_data$wfed,
+    use="complete.obs")
 ```
 
+<<<<<<< HEAD:Ansjory_Han_Queiroz_lab3_draft.Rmd
 As it seems to exists a positive relationship between wages in all studied industries and crime rates, we decided to summerize those variables into 3 more intuitive ones:
 
 Label         | Description
@@ -207,11 +333,7 @@ Again, we can see the correlations seems positive, indicating that higher wages 
 
 One last observation is central N.C. tends to have higher frequency of crime rates than west N.C. and SMSA.
 
-```{r}
-hist(crime_data[crime_data$central == 1, ]$crmrte,
-     main = "Histogram of Crime Rate in Central N.C.",
-     xlab = "Crime Rate")
-```
+
 
 ## The Model Building Process
 
@@ -233,7 +355,7 @@ $$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc + u$$
 Picking variables which are only applicable for policy suggestions as the key interest with no other covariates from each variable.
 
 ```{r}
-(model1 = lm(crmrte ~ prbarr + taxpc,
+(model1 = lm(log(crmrte) ~ prbarr + taxpc,
              data = crime_data))
 plot(model1, which = 5)
 summary(model1)$r.square
@@ -245,7 +367,7 @@ AIC(model1)
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc + \beta_3pctymle + u$$
 ```{r}
-(model2 = lm(crmrte ~ prbarr + taxpc + pctymle,
+(model2 = lm(log(crmrte) ~ prbarr + taxpc + pctymle,
              data = crime_data))
 plot(model2, which = 5)
 summary(model2)$r.square
@@ -253,13 +375,13 @@ summary(model2)$adj.r.squared
 AIC(model2)
 ```
 
-R^2^ increases by 11.9% by adding one additional variable, and AIC decreases by 1.77% to indicate improvements on parsimony. However, there is not a significant changes on accuracy when comparing the Cook's distance. 
+Adjusted R^2^ increases by 11.8% by adding one additional variable, and AIC decreases by 5.78% to indicate improvements on parsimony. However, there is not a significant changes on accuracy when comparing the Cook's distance. 
 
 3. Model that includes the previous covariates, and most, if not all, other covariates.
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv + \beta_3taxpc + \beta_4wloc + \beta_5pctymle + \beta_6density + u$$
 ```{r}
-(model3 = lm(crmrte ~ prbarr + prbconv + taxpc + wloc + pctymle + density,
+(model3 = lm(log(crmrte) ~ prbarr + prbconv + taxpc + wloc + pctymle + density,
              data = crime_data))
 plot(model3, which = 5)
 summary(model3)$r.square
@@ -267,7 +389,7 @@ summary(model3)$adj.r.squared
 AIC(model3)
 ```
 
-R^2^ increases by 28.8% by adding 3 additional variables, and AIC decreases by 7.6% to indicate further improvements on parsimony. Moreover, there is a significant changes on accuracy when comparing the Cook's distance.
+Adjusted R^2^ increases by 34.0% by adding 3 additional variables, and AIC decreases by 24.6% to indicate further improvements on parsimony. Moreover, there is a significant changes on accuracy when comparing the Cook's distance.
 
 ## The Regression Table
 
@@ -292,55 +414,55 @@ The omitted variables discussion will be based on Model 1 with $taxpc$ dropped s
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc +u$$
 $$taxpc = \alpha_0 + \alpha_1prbarr + u$$
 ```{r}
-(omit1_pri = lm(crmrte ~ prbarr + taxpc, data = crime_data))
+(omit1_pri = lm(log(crmrte) ~ prbarr + taxpc, data = crime_data))
 (omit1_sec = lm(taxpc ~ prbarr, data = crime_data))
 ```
 
-Since $\beta_2 = 0.0006133$ and $\alpha_1 = -12.89$, then $OMVB = \beta_2\alpha_1 = -0.0079$. Since $\beta_1 = -0.08 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
+Since $\beta_2 = 0.01279$ and $\alpha_1 = -12.89$, then $OMVB = \beta_2\alpha_1 = -0.1649$. Since $\beta_1 = -2.2938 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
 
 2. Omitted $prbconv$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv +u$$
 $$prbconv = \alpha_0 + \alpha_1prbarr + u$$
 ```{r}
-(omit2_pri = lm(crmrte ~ prbarr + prbconv, data = crime_data))
+(omit2_pri = lm(log(crmrte) ~ prbarr + prbconv, data = crime_data))
 (omit2_sec = lm(prbconv ~ prbarr, data = crime_data))
 ```
 
-Since $\beta_2 = -0.0411$ and $\alpha_1 = -0.1921$, then $OMVB = \beta_2\alpha_1 = 0.007895$. Since $\beta_1 = -0.09581 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance. 
+Since $\beta_2 = -0.9807$ and $\alpha_1 = -0.1921$, then $OMVB = \beta_2\alpha_1 = 0.1884$. Since $\beta_1 = -2.647 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance. 
 
 3. Omitted $pctymle$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2pctymle +u$$
 $$pctymle = \alpha_0 + \alpha_1prbarr + u$$
 ```{r}
-(omit3_pri = lm(crmrte ~ prbarr + pctymle, data = crime_data))
+(omit3_pri = lm(log(crmrte) ~ prbarr + pctymle, data = crime_data))
 (omit3_sec = lm(pctymle ~ prbarr, data = crime_data))
 ```
 
-Since $\beta_2 = 0.15427$ and $\alpha_1 = -0.04568$, then $OMVB = \beta_2\alpha_1 = -0.007$. Since $\beta_1 = -0.08087 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
+Since $\beta_2 = 3.870$ and $\alpha_1 = -0.04568$, then $OMVB = \beta_2\alpha_1 = -0.1768$. Since $\beta_1 = -3.119 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
 
 4. Omitted $density$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2density +u$$
 $$density = \alpha_0 + \alpha_1prbarr + u$$
 ```{r}
-(omit4_pri = lm(crmrte ~ prbarr + density, data = crime_data))
+(omit4_pri = lm(log(crmrte) ~ prbarr + density, data = crime_data))
 (omit4_sec = lm(density ~ prbarr, data = crime_data))
 ```
 
-Since $\beta_2 = 0.007412$ and $\alpha_1 = -5.682$, then $OMVB = \beta_2\alpha_1 = -0.04211$. Since $\beta_1 = -0.08087 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
+Since $\beta_2 = 0.1657$ and $\alpha_1 = -5.682$, then $OMVB = \beta_2\alpha_1 = -0.9415$. Since $\beta_1 = -1.5169 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
 
 5. Omitted $mix$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2mix +u$$
 $$mix = \alpha_0 + \alpha_1prbarr + u$$
 ```{r}
-(omit5_pri = lm(crmrte ~ prbarr + mix, data = crime_data))
+(omit5_pri = lm(log(crmrte) ~ prbarr + mix, data = crime_data))
 (omit5_sec = lm(mix ~ prbarr, data = crime_data))
 ```
 
-Since $\beta_2 = 0.009263$ and $\alpha_1 = 0.3936$, then $OMVB = \beta_2\alpha_1 = 0.00365$. Since $\beta_1 = -0.09156 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance.
+Since $\beta_2 = 0.02237$ and $\alpha_1 = 0.3936$, then $OMVB = \beta_2\alpha_1 = 0.0088$. Since $\beta_1 = -2.4674 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance.
 
 ## Conclusion
 
