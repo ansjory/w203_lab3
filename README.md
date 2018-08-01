@@ -28,3 +28,7 @@ Part 2
 Part 3
 ------
 1. Ansjory_Han_Queiroz_Lab3Part1_reviewed_by_Group3.pdf is our report reviewed by Group 3 with inline comments (need to use native Adobe Acrobat Reader or MacOS Preview to open the comments).
+
+2. Ansjory_Han_Queiroz_Lab3Part3_final.Rmd is the R source file for Part 3 final report.
+
+3. Ansjory_Han_Queiroz_Lab3Part3_final.pdf is the R Markdown report for Part 3 final report.
