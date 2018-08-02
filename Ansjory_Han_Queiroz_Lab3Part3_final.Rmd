@@ -1,0 +1,486 @@
+---
+title: 'W203 Lab 3: Reducing Crime'
+author: "Chi Iong Ansjory, Tsung-Chin Han, Marcelo Queiroz"
+date: 7/31/2018
+output: pdf_document
+---
+
+## Introduction
+
+The motivation of this analysis is to understand the determinants of crime and to generate policy suggestions in order to reduce crime. Imagine that we have been hired to provide research for a political campaign, our data source is primarily the dataset of crime statistics for a selection of counties in North Carolina. 
+
+
+## The Initial EDA
+
+Set up the working directory by putting data file and Rmd file in the same directory.
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir='~/Documents/UC Berkeley MIDS/Summer 2018/DATASCI W203/Lab_3')
+```
+
+Load all necessary libraries for the R functions.
+```{r message=FALSE, warning=FALSE}
+library(car)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+```
+
+Load the cross-section data set into R and inspect it. 
+```{r}
+Data <- read.csv("crime_v2.csv", header=TRUE, sep=",")
+summary(Data)
+```
+
+The data set consists of 97 observations and 25 variables. From the summary, there are 6 of the observations with data consistently missing across variables. $prbconv$ is a factor variable, and some of the variables that are supposed to be probabilities are actually greater than 1. In order to fix these problems, following cleansing of data are performed:
+
+* Convert $prbconv$ from factor to numeric.
+
+* Eliminate 6 observations missing data based $county$.
+
+* Eliminate 10 observations with probability values greater than 1 from $prbarr$, $prbconv$, $prbpris$.
+```{r warning=FALSE}
+Data$prbconv = as.numeric(paste(Data$prbconv))
+subcases = !is.na(Data$county) & !Data$prbarr>1 & !Data$prbconv>1 & !Data$prbpris>1
+crime_data = Data[subcases, ]
+```
+
+Now, the new data frame has 81 observations, which can be assessed to improve our policy suggestions for counties of North Carolina. The available descriptions of variables are:
+
+variable      | label
+--------------|-----------
+year          | 1987
+crmrte        | crimes committed per person
+prbarr        | ‘probability’ of arrest
+prbconv       | ‘probability’ of conviction
+prbpris       | ‘probability’ of prison sentence
+avgsen        | avg. sentence, days
+polpc         | police per capita
+density       | people per sq. mile
+taxpc         | tax revenue per capita
+west          | =1 if in western N.C.
+central       | =1 if in central N.C.
+urban         | =1 if in SMSA
+pctmin80      | perc. minority, 1980
+wcon          | weekly wage, construction
+wtuc          | wkly wge, trns, util, commun
+wtrd          | wkly wge, whlesle, retail trade
+wfir          | wkly wge, fin, ins, real est
+wser          | wkly wge, service industry
+wmfg          | wkly wge, manufacturing
+wfed          | wkly wge, fed employees
+wsta          | wkly wge, state employees
+wloc          | wkly wge, local gov emps
+mix           | offense mix: face-to-face/other
+pctymle       | percent young male
+
+As counties of North Carolina are interested in policy suggestions that could address the crime problem, the dependent variable will be $crmrte$, or crimes committed per person.
+
+Additionally, as analyzing 25 variables would be inefficient, we decided to divide our analysis into 3 groups based on natures of variables. We will have a group of variables for models that explains how convictions and police enforcement relates to crime rates, another group for models that explains how econo-geographic data influences crime rates, and last group for models that covers variations in wages and industry differences.
+
+This division may be useful to figure out variables that may be used for building model specifications later, more robust and contemplating all kinds of variables. Also this was chosen in order to make the campaign decision making process easier since policies usually have well defined areas of impact, such as housing, employment, police forces, and so on.
+
+First of all, our goal is to understand the determinants of crime, crimes committed per person $crmrte$ is more direct as to what we want to measure. Therefore, our dependent variable will be $crmte$ (%). Let's first look at the un-transformed data.
+```{r}
+# to better understand the skewness distribution and it's spread graphically
+par(mfrow=c(1,2))
+hist(crime_data$crmrte, xlab="Crime Rate",
+     col="light blue",
+     main="Histogram of Crime Rate", ylim=c(0,30))
+lines(density(crime_data$crmrte, na.rm=T),
+      col="dark red")
+rug(jitter(crime_data$crmrte))
+qqnorm(crime_data$crmrte, main="QQ Plot of Crime Rate")
+qqline(crime_data$crmrte, col="dark red")
+
+# boxplot
+par(mfrow=c(1,1))
+boxplot(crime_data$crmrte, ylab="Crime Rate")
+rug(jitter(crime_data$crmrte), side=2)
+abline(h=mean(crime_data$crmrte, na.rm=T), lty=2)
+```
+
+The crime rate has right skew with the mean at 0.033, and median at 0.030. The distribution is not normally distibuted. The box plot also shows more possible outliers have distorted the value of the mean as a statistic of centrality. Also, the variable $crmrte$ has a distribution of the observed values concentrated on low values, thus with a positive skew.
+
+One other observation is central N.C. tends to have higher frequency of crime rates than west N.C. and SMSA.
+
+```{r}
+par(mfrow=c(1,3))
+
+# Histogram of Crime Rate in Central N.C.
+hist(crime_data[crime_data$central == 1, ]$crmrte, col="light blue", 
+     main="Central N.C.", xlab="Crime Rate", ylim=c(0,30))
+
+# Histogram of Crime Rate in West N.C.
+hist(crime_data[crime_data$west == 1, ]$crmrte, col="light blue", 
+     main="West N.C.", xlab="Crime Rate", ylim=c(0,30))
+
+# Histogram of Crime Rate in SMSA
+hist(crime_data[crime_data$urban == 1, ]$crmrte, col="light blue", 
+     main="SMSA", xlab="Crime Rate", ylim=c(0,30))
+```
+
+Now, let's see what happens if we apply log transformation on the dependent variable $crmrte$.
+```{r}
+# to better understand the skewness distribution and it's spread graphically
+par(mfrow=c(1,2))
+hist(log(crime_data$crmrte), xlab="Logarithm of Crime Rate",
+     col="light blue",
+     main="Histogram of log(crmrte)", ylim=c(0,30))
+lines(density(log(crime_data$crmrte), na.rm=T),
+      col="dark red")
+rug(jitter(log(crime_data$crmrte)))
+qqnorm(log(crime_data$crmrte), main="QQ Plot of log(crmrate)")
+qqline(log(crime_data$crmrte), col="dark red")
+
+# boxplot
+par(mfrow=c(1,1))
+boxplot(log(crime_data$crmrte), ylab="log(crmrte)")
+rug(jitter(log(crime_data$crmrte)), side=2)
+abline(h=mean(log(crime_data$crmrte), na.rm=T), lty=2)
+```
+
+Clearly, if we apply log transformation on crime rate, our distribution becomes normally distibuted with mean and median to be very close, almost no skew and symmetric. This log transformed crime rate could be more ideal when it comes to modelling for OLS.
+
+Next, we break the independent variables into 3 groups to examine the relationship against crime rate.
+
+First group is crime-related variables: $prbarr, prbconv, prbpris, avgsen, mix$. This group could explain how convictions and police enforcement relate to crime rates. Inspecting histograms of each variable and turns out $mix$ needs to be log transformed.
+
+variable      | label
+--------------|-----------
+crmrte        | crimes committed per person
+prbarr        | ‘probability’ of arrest
+prbconv       | ‘probability’ of conviction
+prbpris       | ‘probability’ of prison sentence
+avgsen        | avg. sentence, days
+mix           | offense mix: face-to-face/other
+```{r}
+par(mfrow=c(1,5))
+hist(crime_data$prbarr, col="light blue", main="prbarr") # close to normal
+hist(crime_data$prbconv, col="light blue", main="prbconv") # close to normal
+hist(crime_data$prbpris, col="light blue", main="prbpris") # close to normal
+hist(crime_data$avgsen, col="light blue", main="avgsen") # close to normal
+hist(log(crime_data$mix), col="light blue", main="log(mix)") # close to normal
+```
+
+First scatterplot matrix is crime rate with variables related to the nature of crime: probabilities of arrest, conviction and prison sentence, average sentence days, and log transformation of offense mix. 
+
+Here are some features noticed from the matrix:
+
+* There are noticable negative relationship between crime rate and probability of arrest, crime rate and probability of conviction.
+
+* There is strong positive relationship between probability of arrest and offense mix.
+
+* Probability of prison sentence and average sentence days do not seem to have a strong relationship with any other variables in this group.
+
+```{r}
+scatterplotMatrix(~ log(crmrte) + prbarr + prbconv + prbpris + avgsen + log(mix), 
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Nature of Crime")
+cor(log(crime_data$crmrte), crime_data$prbarr, use="complete.obs")
+cor(log(crime_data$crmrte), crime_data$prbconv, use="complete.obs")
+```
+
+Second group is population-related variables: $polpc, density, pctmin80, pctymle$. This group could explain how econo-geographic data influences crime rate. Inspecting histograms of each variable and turns out $pctymle$ needs to be log transformed.
+
+variable      | label
+--------------|-----------
+crmrte        | crimes committed per person
+polpc         | police per capita
+density       | people per sq. mile
+pctmin80      | perc. minority, 1980
+pctymle       | percent young male
+```{r}
+par(mfrow=c(1,4))
+hist(crime_data$polpc, col="light blue", main="polpc") # close to normal
+hist(crime_data$density, col="light blue", main="density") # right skew
+hist(crime_data$pctmin80, col="light blue", main="pctmin80") # close to normal
+hist(log(crime_data$pctymle), col="light blue", main="log(pctymle)") # right skew
+```
+
+Second scatterplot matrix is crime rate with variables related to population: police per capita, people per square mile, % minority, and log transformation of % young male.
+
+Here are some features noticed from the matrix:
+
+* There are noticable positive relationship between crime rate and police per capita, crime rate and people per sq. mi., % young male and crime rate.
+
+* Positive relationship between crime rate and police per capita seems to be an anomaly since crime rate is supposed to go down if there is more police per capita. Therefore, $polpc$ could be a top-coded variable with data not reflected with appropriate variable name.
+
+* % minority does not seem to have a strong relationship with any other variables in this group.
+
+```{r}
+scatterplotMatrix(~ crmrte + polpc + density + pctmin80 + log(pctymle), 
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Population")
+cor(log(crime_data$crmrte), crime_data$density, use="complete.obs")
+```
+
+Third group is economy-related variables: $taxpc, wcon, wtuc, wtrd, wfir, wser, wmfg, wfed, wsta, wtoc$. This group could cover variations in wages and industry differences. Inspecting histograms of each variable.
+
+variable      | label
+--------------|-----------
+taxpc         | tax revenue per capita
+wcon          | weekly wage, construction
+wtuc          | wkly wge, trns, util, commun
+wtrd          | wkly wge, whlesle, retail trade
+wfir          | wkly wge, fin, ins, real est
+wser          | wkly wge, service industry
+wmfg          | wkly wge, manufacturing
+wfed          | wkly wge, fed employees
+wsta          | wkly wge, state employees
+wloc          | wkly wge, local gov emps
+```{r}
+par(mfrow=c(2,5))
+hist(crime_data$taxpc, col="light blue", main="taxpc") # right skew
+hist(crime_data$wcon, col="light blue", main="wcon") # close to normal
+hist(crime_data$wtuc, col="light blue", main="wtuc") # close to normal
+hist(crime_data$wtrd, col="light blue", main="wtrd") # close to normal
+hist(crime_data$wfir, col="light blue", main="wfir") # close to normal
+
+hist(crime_data$wser, col="light blue", main="wser") # close to normal
+hist(crime_data$wmfg, col="light blue", main="wmfg") # close to normal
+hist(crime_data$wfed, col="light blue", main="wfed") # close to normal
+hist(crime_data$wsta, col="light blue", main="wsta") # close to normal
+hist(crime_data$wloc, col="light blue", main="wloc") # close to normal
+```
+
+Third scatterplot matrix is crime rate with variables related to wages: tax revenue per capita, weekly wages of 6 different industries, and wages of federal, state, and local employees.
+
+Here are some features noticed from the matrix:
+
+* There are strong relationship between crime rate and all variables in this group.
+
+```{r}
+scatterplotMatrix(~ crmrte + taxpc + wcon + wtuc + wtrd + wfir + wser + wmfg + wfed + wsta + wloc,
+                  data = crime_data,
+                  main = "Scatterplot Matrix for Variables of Wages" )
+cor(log(crime_data$crmrte), crime_data$wcon, use="complete.obs")
+cor(log(crime_data$crmrte), crime_data$wtrd, use="complete.obs")
+cor(log(crime_data$crmrte), crime_data$wfed, use="complete.obs")
+```
+
+## The Model Building Process
+
+The purpose of this analysis is to identify independent variables relevant to the concerns of the political campaign in order to reduce crime rate. 
+
+Those variables found correlated to crime rate from EDA as follow:
+
+* $prbarr$, $prbconv$, $taxpc$: these variables could potentially be applicable and implementable for policy suggestions.
+
+* $density$, $pctymle$, $wcon$, $wtuc$, $wtrd$, $wfir$, $wser$, $wmfg$, $wfed$, $wsta$, $wloc$: these variables could not be directly applicable for policy suggestions.
+
+The covariates that help us further identify a causal effect are $prbarr$ and $prbconv$, $density$ and $pctymle$ based on output from scatterplots. On the other hand, the problematic covariates due to multicollinearity are $taxpc$ and $w*$ (all wages variables) seen from the scatterplot above since they will absorb some of causal effect we want to measure.
+
+We will consider building 3 model specifications:
+
+1. Model with only the explanatory variables of key interest and no other covariates.
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc + u$$
+Picking variables which are only applicable for policy suggestions as the key interest with no other covariates from each variable. Picked $prbarr$ but not $prbconv$ to avoid any potential effects from covariates.
+
+```{r}
+(model1 = lm(log(crmrte) ~ prbarr + taxpc, data = crime_data))
+plot(model1, which = 5)
+summary(model1)$r.square
+summary(model1)$adj.r.squared
+AIC(model1)
+```
+
+2. Model that includes key explanatory variables and only covariates that we believe increase the accuracy of your results.
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc + \beta_3pctymle + u$$
+```{r}
+(model2 = lm(log(crmrte) ~ prbarr + taxpc + pctymle, data = crime_data))
+plot(model2, which = 5)
+summary(model2)$r.square
+summary(model2)$adj.r.squared
+AIC(model2)
+```
+
+Adjusted R^2^ increases by 11.8% by adding one additional variable, and AIC decreases by 5.78% to indicate improvements on parsimony. However, there is not a significant improvement as the solid red line still getting very close to the danger zone of Cook's distance. 
+
+3. Model that includes the previous covariates, and most, if not all, other covariates.
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv + \beta_3taxpc + \beta_4wloc + \beta_5pctymle + \beta_6density + u$$
+```{r}
+(model3 = lm(log(crmrte) ~ prbarr + prbconv + taxpc + wloc + pctymle + density,
+             data = crime_data))
+plot(model3, which = 5)
+summary(model3)$r.square
+summary(model3)$adj.r.squared
+AIC(model3)
+```
+
+Adjusted R^2^ increases by 34.0% by adding 3 additional variables, and AIC decreases by 24.6% to indicate further improvements on parsimony. Moreover, there is a significant improvement since the solid red line moves away from the danger zone of Cook's distance.
+
+## The Regression Table
+
+Now consolidating all statistical findings from these 3 models to a regression table.
+```{r, results='asis'}
+se.model1 = sqrt(diag(vcovHC(model1)))
+se.model2 = sqrt(diag(vcovHC(model2)))
+se.model3 = sqrt(diag(vcovHC(model3)))
+stargazer(model1, model2, model3, type = "latex", 
+          title = "Linear Models Predicting Crime Rate",
+          omit.stat = "f",
+          se = list(se.model1, se.model2, se.model3),
+          star.cutoffs = c(0.05, 0.01, 0.001)) 
+```
+
+According to Table 5^[Hlavac, Marek (2018). stargazer: Well-Formatted Regression and Summary Statistics Tables. R package version 5.2.2. https://CRAN.R-project.org/package=stargazer], for Model 1, increasing the probability of arrest will reduce crime rate with minimal effect from tax revenue per capita. For Model 2, on top of Model 1, decreasing % of young male will reduce crime rate. For Model 3, on top of Model 2, increasing both probabilities of arrest and conviction, decreasing people per sq. mi. will reduce crime rate.
+
+Model 2 is being picked as our most important model specification as all 3 independent variables ($prbarr$, $taxpc$, $pctymle$) are statistically significant. A detailed assessment of all 6 classical linear model assumptions will be performed.
+
+1. Linear population model
+
+We don't need to check the linear population model, because we haven't constrained the error term, so there is nothing to check at this point.
+
+2. Random sampling
+
+To check random sampling, we need background knowledge of how the data was collected. Looks like the dataset came from 3 different regions of counties of North Carolina.
+
+3. No perfect multicollinearity
+
+No need to explicitly check for perfect collinearity, because R will alert us if this rare condition happens.
+
+4. Zero-conditional mean
+
+We start looking at the diagnostic plot:
+```{r}
+plot(model2, which=1)
+```
+
+There is no clear deviation from zero conditional mean indicated by the red line in residuals versus fitted values plot.
+
+5. Homoskedasticity
+
+The residuals versus fitted values plot doesn't seem to indicate heterskedasticity, because the band seems to have even thickness. The scale location plot gives us another way to access this assumption:
+```{r}
+plot(model2, which=3)
+bptest(model2)
+```
+
+The red line also suggests homoskedasticity. Despite this evidence, we will proceed with robust standard errors, because that is good conservative practice. Also, through a Breusch-Pagan test, the null hypothesis is the model has homoskedasticity. p-value indicates we can't reject the null hypothesis, meaning heteroskedasticity is not present.
+
+6. Normality of errors
+
+To check normality of errors, we can look at the qqplot that is part of R's standard diagnostics:
+```{r}
+plot(model2, which=2)
+```
+
+We can also visually look at the residuals directly:
+```{r}
+hist(model2$residuals, breaks=10, col="light blue",
+     main="Residuals from Linear Model Predicting Crime Rate")
+```
+
+We have a sample size > 30, so the CLR tells us that our estimators will have a normal sampling distribution. We might also consider the formal Shapiro-Wilk test of normality. The null hypothesis is the residuals are normally distributed. p-value indicates it can't be rejected, meaning residuals are with normal distribution.
+```{r}
+shapiro.test(model2$residuals)
+```
+
+Next, inference for linear regression and standard errors via statistical tests will be inspected through model coefficients completed with standard errors that are valid given our diagnostics. We noticed that $prbarr$, $taxpc$, and $pctymle$ are all statistically significant.
+```{r}
+coeftest(model2, vcov=vcovHC)
+```
+
+In general, Model 2 doesn't seem to violate any of the 6 linear model assumptions.
+
+However, Model 1 demostrates violation of zero-conditional mean, homoskedasticity, and normality of errors:
+```{r}
+plot(model1, which=1) # red line is not flat enough
+plot(model1, which=3) # red line is parabolic
+hist(model1$residuals, breaks=10, col="light blue",
+     main="Residuals from Linear Model Predicting Crime Rate") # right skew
+```
+
+Model 3 demostrates violation of homoskedasticity and normality of errors:
+```{r}
+plot(model3, which=3) # red line is parabolic
+hist(model3$residuals, breaks=10, col="light blue",
+     main="Residuals from Linear Model Predicting Crime Rate") # left skew
+```
+
+To test whether the difference in fit is significant, we use the wald test, which generalizes the usual F-test of overall significance, but allows for a heteroskedasticity-robust covariance matrix. p-value indicates that the difference in fit is statistically significant.
+```{r}
+waldtest(model3, model2, vcov = vcovHC)
+```
+
+Now, we could test the additional 3 variables in Model 3 and see if they are jointly significant. In fact, they are and there is probably a great deal of multicollinearity.
+```{r}
+linearHypothesis(model3, c("prbconv = 0", "wloc = 0", "density = 0"), vcov = vcovHC)
+```
+
+Next, we could test if coefficients of $prbarr$ and $prbconv$ are the same. In turns out that this hypothesis is statistically significant.
+```{r}
+linearHypothesis(model3, "prbarr = prbconv", vcov = vcovHC)
+```
+
+## The Omitted Variables Discussion
+
+The omitted variables discussion will be based on Model 1 with $taxpc$ dropped since its effect is minimal with following 5 variables omitted one at a time.
+
+1. Omitted $taxpc$
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc +u$$
+$$taxpc = \alpha_0 + \alpha_1prbarr + u$$
+```{r}
+(omit1_pri = lm(log(crmrte) ~ prbarr + taxpc, data = crime_data))
+(omit1_sec = lm(taxpc ~ prbarr, data = crime_data))
+```
+
+Since $\beta_2 = 0.01279$ and $\alpha_1 = -12.89$, then $OMVB = \beta_2\alpha_1 = -0.1649$. Since $\beta_1 = -2.2938 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
+
+2. Omitted $prbconv$
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv +u$$
+$$prbconv = \alpha_0 + \alpha_1prbarr + u$$
+```{r}
+(omit2_pri = lm(log(crmrte) ~ prbarr + prbconv, data = crime_data))
+(omit2_sec = lm(prbconv ~ prbarr, data = crime_data))
+```
+
+Since $\beta_2 = -0.9807$ and $\alpha_1 = -0.1921$, then $OMVB = \beta_2\alpha_1 = 0.1884$. Since $\beta_1 = -2.647 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance. 
+
+3. Omitted $pctymle$
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2pctymle +u$$
+$$pctymle = \alpha_0 + \alpha_1prbarr + u$$
+```{r}
+(omit3_pri = lm(log(crmrte) ~ prbarr + pctymle, data = crime_data))
+(omit3_sec = lm(pctymle ~ prbarr, data = crime_data))
+```
+
+Since $\beta_2 = 3.870$ and $\alpha_1 = -0.04568$, then $OMVB = \beta_2\alpha_1 = -0.1768$. Since $\beta_1 = -3.119 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
+
+4. Omitted $density$
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2density +u$$
+$$density = \alpha_0 + \alpha_1prbarr + u$$
+```{r}
+(omit4_pri = lm(log(crmrte) ~ prbarr + density, data = crime_data))
+(omit4_sec = lm(density ~ prbarr, data = crime_data))
+```
+
+Since $\beta_2 = 0.1657$ and $\alpha_1 = -5.682$, then $OMVB = \beta_2\alpha_1 = -0.9415$. Since $\beta_1 = -1.5169 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
+
+5. Omitted $mix$
+
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2mix +u$$
+$$mix = \alpha_0 + \alpha_1prbarr + u$$
+```{r}
+(omit5_pri = lm(log(crmrte) ~ prbarr + mix, data = crime_data))
+(omit5_sec = lm(mix ~ prbarr, data = crime_data))
+```
+
+Since $\beta_2 = 0.02237$ and $\alpha_1 = 0.3936$, then $OMVB = \beta_2\alpha_1 = 0.0088$. Since $\beta_1 = -2.4674 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance.
+
+## Conclusion
+
+Based on the analysis and comparison on several models, the determinants of crime are essentially probability of arrest, tax revenue per capita, and % young male. In order to anticipate  reduction of crime, the actionable policy suggestions would be as follow for local government:
+
+* Increase the probability of arrest when offense occurs.
+
+* Decrease the tax revenue per capita by reducing local tax rate.
+
+* Decrease the % young male by allocating more police workforce to manage communities with high % of young male, especially in area of central N.C.
