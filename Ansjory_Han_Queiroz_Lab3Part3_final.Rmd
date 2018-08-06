@@ -38,13 +38,18 @@ The data set consists of 97 observations and 25 variables. From the summary, the
 * Eliminate 6 observations missing data based $county$.
 
 * Eliminate 10 observations with probability values greater than 1 from $prbarr$, $prbconv$, $prbpris$.
+
+* Eliminate 1 observation by reassigning the indices to country number.
 ```{r warning=FALSE}
 Data$prbconv = as.numeric(paste(Data$prbconv))
 subcases = !is.na(Data$county) & !Data$prbarr>1 & !Data$prbconv>1 & !Data$prbpris>1
 crime_data = Data[subcases, ]
+crime_data[duplicated(crime_data$county),]
+crime_data <- crime_data[1:80,]
+row.names(crime_data) <- crime_data$county
 ```
 
-Now, the new data frame has 81 observations, which can be assessed to improve our policy suggestions for counties of North Carolina. The available descriptions of variables are:
+Now, the new data frame has 80 observations, which can be assessed to improve our policy suggestions for counties of North Carolina. The available descriptions of variables are:
 
 variable      | label
 --------------|-----------
@@ -172,6 +177,7 @@ Here are some features noticed from the matrix:
 
 * Probability of prison sentence and average sentence days do not seem to have a strong relationship with any other variables in this group.
 
+Additionally, it is interesting to the point that probabilty of arrest $prbarr$ and probability of convicition $prbconv$ are not highly correlated as we could expect from common sense. This indicates that keeping the two variables in an analysis will  weaken our model due to multicolinearity, but furthter investigation will be necessary.
 ```{r}
 scatterplotMatrix(~ log(crmrte) + prbarr + prbconv + prbpris + avgsen + log(mix), 
                   data = crime_data,
@@ -203,7 +209,7 @@ Here are some features noticed from the matrix:
 
 * There are noticable positive relationship between crime rate and police per capita, crime rate and people per sq. mi., % young male and crime rate.
 
-* Positive relationship between crime rate and police per capita seems to be an anomaly since crime rate is supposed to go down if there is more police per capita. Therefore, $polpc$ could be a top-coded variable with data not reflected with appropriate variable name.
+* Positive relationship between crime rate and police per capita seems to be an anomaly since crime rate is supposed to go down if there is more police per capita. Therefore, $polpc$ could be a top-coded variable with data not reflected with appropriate variable name. This could also be explained by local governments increasing police presence in higher crime rate areas as an attempt to reduce crimies. If this is true, however, we can see that increasing police only can't reduce crime rate.
 
 * % minority does not seem to have a strong relationship with any other variables in this group.
 
@@ -272,33 +278,63 @@ The covariates that help us further identify a causal effect are $prbarr$ and $p
 
 We will consider building 3 model specifications:
 
-1. Model with only the explanatory variables of key interest and no other covariates.
+### 1. Model with only the explanatory variables of key interest and no other covariates.
 
-$$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc + u$$
-Picking variables which are only applicable for policy suggestions as the key interest with no other covariates from each variable. Picked $prbarr$ but not $prbconv$ to avoid any potential effects from covariates.
-
+$$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv + \beta_3taxpc + u$$
+Picking variables which are only applicable for policy suggestions as the key interest with no other covariates from each variable. As discussed earlier, we decided to keep probabilities of arrest and conviction in our model, since they are not highly correlated as common sense could infer.
 ```{r}
-(model1 = lm(log(crmrte) ~ prbarr + taxpc, data = crime_data))
+(model1 = lm(log(crmrte) ~ prbarr + prbconv + taxpc, data = crime_data))
 plot(model1, which = 5)
 summary(model1)$r.square
 summary(model1)$adj.r.squared
 AIC(model1)
+coeftest(model1, vcov = vcovHC)
 ```
 
-2. Model that includes key explanatory variables and only covariates that we believe increase the accuracy of your results.
+This model suggests that points 53, 55, and 113 have high Cook's distance, so further investigations were made to define why they are outliers comparing to the expectations of the variables of all other counties.
+```{r}
+avg_county <- colMeans(crime_data)
+outliers_compare <- data.frame(t(avg_county))
+outliers_compare$county <- 999
+outliers_compare <- rbind(crime_data[c("53","55","113"),], outliers_compare)
+head(outliers_compare)
+```
+We see that no major deviations are found. When analyzing county 55, we see that this is an area with considerable high crime rates, but with all variables not very different from the others. Based on population density and the wages, we can infer this is a rural county, which economy is based on construction and transportation industries. The highlight here is the $taxpc$ variable: it is more than 3 times the average. This discrepancy probably is generating our leverage, but as we don't have enough evidence that this is a erroneous error, we will keep that point in the data set.
+
+The counties represented by 53 and 113 are the opposite. They have crime rates as low as 40% of the state average. Small population density and no assumptions can be made based only in the wages per industry. As we did with 55, we found no strong evidence that thi data is wrong, thus keeping the data in our data set. It is also interesting to note that the 3 outliers have completely different values for $pctmin80$, yet still have similar values for most variables. This endorses our decision to not use that variable.
+
+### 2. Model that includes key explanatory variables and only covariates that we believe increase the accuracy of your results.
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc + \beta_3pctymle + u$$
+```{r}
+(model2 = lm(log(crmrte) ~ prbarr + prbconv + taxpc + pctymle, data = crime_data))
+plot(model2, which = 5)
+summary(model2)$r.square
+summary(model2)$adj.r.squared
+coeftest(model2, vcov = vcovHC)
+```
+
+Note by the coefficients that the $prbconv$ variable is the only one without statistical significance in this test, so the model was rebuilt to remove that variable. As stated earlier, this variable is not correlatd to $prbarr$, however it can have relationship with the other (even omitted ones that were lumped under the error term and are not available for analysis).
 ```{r}
 (model2 = lm(log(crmrte) ~ prbarr + taxpc + pctymle, data = crime_data))
 plot(model2, which = 5)
 summary(model2)$r.square
 summary(model2)$adj.r.squared
 AIC(model2)
+coeftest(model2, vcov = vcovHC)
 ```
 
-Adjusted R^2^ increases by 11.8% by adding one additional variable, and AIC decreases by 5.78% to indicate improvements on parsimony. However, there is not a significant improvement as the solid red line still getting very close to the danger zone of Cook's distance. 
+Adjusted R^2^ increases by 0.84% by adding one additional variable, and AIC decreases by 0.61% to indicate improvements on parsimony. However, there is not a significant improvement as the solid red line still getting very close to the danger zone of Cook's distance. 
 
-3. Model that includes the previous covariates, and most, if not all, other covariates.
+Additionally, there is a new outlier, county 133, which we can investigate.
+```{r}
+outliers_compare <- rbind(crime_data[c("133"),], outliers_compare)
+outliers_compare[c("133","1"),]
+```
+
+As expected, the $pctymle$ variable is substantially higher than the state average. However, there are no evidences that there is an error in our data. So the observation will still be used in our data set.
+
+### 3. Model that includes the previous covariates, and most, if not all, other covariates.
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv + \beta_3taxpc + \beta_4wloc + \beta_5pctymle + \beta_6density + u$$
 ```{r}
@@ -310,7 +346,7 @@ summary(model3)$adj.r.squared
 AIC(model3)
 ```
 
-Adjusted R^2^ increases by 34.0% by adding 3 additional variables, and AIC decreases by 24.6% to indicate further improvements on parsimony. Moreover, there is a significant improvement since the solid red line moves away from the danger zone of Cook's distance.
+Adjusted R^2^ increases by 33.0% by adding 3 additional variables, and AIC decreases by 23.8% to indicate further improvements on parsimony. Moreover, there is a significant improvement since the solid red line moves away from the danger zone of Cook's distance.
 
 ## The Regression Table
 
@@ -328,30 +364,32 @@ stargazer(model1, model2, model3, type = "latex",
 
 According to Table 5^[Hlavac, Marek (2018). stargazer: Well-Formatted Regression and Summary Statistics Tables. R package version 5.2.2. https://CRAN.R-project.org/package=stargazer], for Model 1, increasing the probability of arrest will reduce crime rate with minimal effect from tax revenue per capita. For Model 2, on top of Model 1, decreasing % of young male will reduce crime rate. For Model 3, on top of Model 2, increasing both probabilities of arrest and conviction, decreasing people per sq. mi. will reduce crime rate.
 
+## The Model Assumptions and Statistical Inference Discussion
+
 Model 2 is being picked as our most important model specification as all 3 independent variables ($prbarr$, $taxpc$, $pctymle$) are statistically significant. A detailed assessment of all 6 classical linear model assumptions will be performed.
 
-1. Linear population model
+### 1. Linear population model
 
-We don't need to check the linear population model, because we haven't constrained the error term, so there is nothing to check at this point.
+We can assume that this model has linear coefficients only because we have not constrained our error term. The assumption that the error term will incorporate non-linearities is true, and so the model is linear.
 
-2. Random sampling
+### 2. Random sampling
 
-To check random sampling, we need background knowledge of how the data was collected. Looks like the dataset came from 3 different regions of counties of North Carolina.
+While background data was not provided for this analysis, we notice that our sample has 80 different counties. A quick search on North Carolina website shows 100 counties in that state, with the youngest one created in 1911 and none incorporated by other since then. Under this fact, the assumption that the numbers are official from each county. We can assume that we have analyzed data referent to 80% of the population, being enough to reduce the non-random sampling effect to minimum.
 
-3. No perfect multicollinearity
+### 3. No perfect multicollinearity
 
-No need to explicitly check for perfect collinearity, because R will alert us if this rare condition happens.
+As R didn't warn for any perfect collinearity, this assumption is met. Additionally we visually checked for that using \texttt{scatterplotMatrix} and the correlation index.
 
-4. Zero-conditional mean
+### 4. Zero-conditional mean
 
 We start looking at the diagnostic plot:
 ```{r}
 plot(model2, which=1)
 ```
 
-There is no clear deviation from zero conditional mean indicated by the red line in residuals versus fitted values plot.
+As evidenced in residuals versus fitted values plot, there is no clear deviation from zero conditional mean indicated by the red line. Therefore, we can consider the zero-conditional assumption met.
 
-5. Homoskedasticity
+### 5. Homoskedasticity
 
 The residuals versus fitted values plot doesn't seem to indicate heterskedasticity, because the band seems to have even thickness. The scale location plot gives us another way to access this assumption:
 ```{r}
@@ -359,9 +397,9 @@ plot(model2, which=3)
 bptest(model2)
 ```
 
-The red line also suggests homoskedasticity. Despite this evidence, we will proceed with robust standard errors, because that is good conservative practice. Also, through a Breusch-Pagan test, the null hypothesis is the model has homoskedasticity. p-value indicates we can't reject the null hypothesis, meaning heteroskedasticity is not present.
+The fairly flat red line also suggests homoskedasticity. Despite this evidence, we will proceed with robust standard errors, because that is good conservative practice. Also, through a Breusch-Pagan test, the null hypothesis is the model has homoskedasticity. p-value indicates we can't reject the null hypothesis, meaning heteroskedasticity is not present.
 
-6. Normality of errors
+### 6. Normality of errors
 
 To check normality of errors, we can look at the qqplot that is part of R's standard diagnostics:
 ```{r}
@@ -420,7 +458,7 @@ linearHypothesis(model3, "prbarr = prbconv", vcov = vcovHC)
 
 The omitted variables discussion will be based on Model 1 with $taxpc$ dropped since its effect is minimal with following 5 variables omitted one at a time.
 
-1. Omitted $taxpc$
+### 1. Omitted $taxpc$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2taxpc +u$$
 $$taxpc = \alpha_0 + \alpha_1prbarr + u$$
@@ -431,7 +469,7 @@ $$taxpc = \alpha_0 + \alpha_1prbarr + u$$
 
 Since $\beta_2 = 0.01279$ and $\alpha_1 = -12.89$, then $OMVB = \beta_2\alpha_1 = -0.1649$. Since $\beta_1 = -2.2938 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
 
-2. Omitted $prbconv$
+### 2. Omitted $prbconv$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2prbconv +u$$
 $$prbconv = \alpha_0 + \alpha_1prbarr + u$$
@@ -442,7 +480,7 @@ $$prbconv = \alpha_0 + \alpha_1prbarr + u$$
 
 Since $\beta_2 = -0.9807$ and $\alpha_1 = -0.1921$, then $OMVB = \beta_2\alpha_1 = 0.1884$. Since $\beta_1 = -2.647 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance. 
 
-3. Omitted $pctymle$
+### 3. Omitted $pctymle$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2pctymle +u$$
 $$pctymle = \alpha_0 + \alpha_1prbarr + u$$
@@ -453,7 +491,7 @@ $$pctymle = \alpha_0 + \alpha_1prbarr + u$$
 
 Since $\beta_2 = 3.870$ and $\alpha_1 = -0.04568$, then $OMVB = \beta_2\alpha_1 = -0.1768$. Since $\beta_1 = -3.119 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
 
-4. Omitted $density$
+### 4. Omitted $density$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2density +u$$
 $$density = \alpha_0 + \alpha_1prbarr + u$$
@@ -464,7 +502,7 @@ $$density = \alpha_0 + \alpha_1prbarr + u$$
 
 Since $\beta_2 = 0.1657$ and $\alpha_1 = -5.682$, then $OMVB = \beta_2\alpha_1 = -0.9415$. Since $\beta_1 = -1.5169 < 0$, the OLS coefficient on $prbarr$ will be scaled away from zero (more negative) gaining statistical significance.
 
-5. Omitted $mix$
+### 5. Omitted $mix$
 
 $$crmrte = \beta_0 + \beta_1prbarr + \beta_2mix +u$$
 $$mix = \alpha_0 + \alpha_1prbarr + u$$
@@ -475,12 +513,27 @@ $$mix = \alpha_0 + \alpha_1prbarr + u$$
 
 Since $\beta_2 = 0.02237$ and $\alpha_1 = 0.3936$, then $OMVB = \beta_2\alpha_1 = 0.0088$. Since $\beta_1 = -2.4674 < 0$, the OLS coefficient on $prbarr$ will be scaled toward zero (less negative) losing statistical significance.
 
+### 6. Other omitted variables
+
+While our dataset has 25 variables, we noticed that more socioeconomic and infrastructure variables could improve our model. Examples of extra variables that could be added, and the theories we could test with them are:
+
+* Education degree of population (better skilled residents may commit less crime).
+
+* Average number of years of residents (transient population may commit more crimes).
+
+* Umemployment numbers (people that are not working tends to recur to crime).
+
+* Weather (harsh weather may reduce incentives for crime).
+
+* Some way to measure the cultural acceptance to small crimes (crime rate scales from the minor misdemeanors, as New York crime reduction in the 90's suggests).
+
 ## Conclusion
 
 Based on the analysis and comparison on several models, the determinants of crime are essentially probability of arrest, tax revenue per capita, and % young male. In order to anticipate  reduction of crime, the actionable policy suggestions would be as follow for local government:
 
-* Increase the probability of arrest when offense occurs.
+* Increase the probability of arrest when offense occurs. This doesn't necessarily mean increasing the number of police officers on the street as seen in our analysis. This change could be addressed with programs that incentivizes crime reporting practices and population confidence in the law enforcement. Our best model suggests that an improvement of 1 percentual point in arresting people that committed crimes may improve crime rate of 2%.
 
 * Decrease the tax revenue per capita by reducing local tax rate.
+Less tax means more money in counties' economy, so it may be a way to improve earnings by the population and decrease criminality. The effect, however may not be really big, is that reducing 1 percentual point in the tax revenue per capita may reduce crime rate by approximately 0.13%. In other words, this variable may have a high statistical significance but not a practical one.
 
-* Decrease the % young male by allocating more police workforce to manage communities with high % of young male, especially in area of central N.C.
+* Decrease the percentage of young male population in communities. While this can turn into a highly unethical advice, we can try to address this matter with making other areas attractive to young male population using government fostered jobs, for example.
