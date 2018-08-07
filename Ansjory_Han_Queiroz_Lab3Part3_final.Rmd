@@ -25,13 +25,13 @@ library(sandwich)
 library(stargazer)
 ```
 
-Load the cross-section data set into R and inspect it. 
+Load the cross-section dataset into R and inspect it. 
 ```{r}
 Data <- read.csv("crime_v2.csv", header=TRUE, sep=",")
 summary(Data)
 ```
 
-The data set consists of 97 observations and 25 variables. From the summary, there are 6 of the observations with data consistently missing across variables. $prbconv$ is a factor variable, and some of the variables that are supposed to be probabilities are actually greater than 1. In order to fix these problems, following cleansing of data are performed:
+The dataset consists of 97 observations and 25 variables. From the summary, there are observations with data consistently missing across variables. $prbconv$ is a factor variable, and some of the variables that are supposed to be probabilities are actually greater than 1. Reassigning the indices to county number is needed too. In order to fix these problems, following cleansing of data are performed:
 
 * Convert $prbconv$ from factor to numeric.
 
@@ -177,7 +177,7 @@ Here are some features noticed from the matrix:
 
 * Probability of prison sentence and average sentence days do not seem to have a strong relationship with any other variables in this group.
 
-Additionally, it is interesting to the point that probabilty of arrest $prbarr$ and probability of convicition $prbconv$ are not highly correlated as we could expect from common sense. This indicates that keeping the two variables in an analysis will  weaken our model due to multicolinearity, but furthter investigation will be necessary.
+Additionally, it is interesting to the point that probabilty of arrest $prbarr$ and probability of conviction $prbconv$ are not highly correlated as we could expect from common sense. This indicates that keeping the two variables in an analysis will  weaken our model due to multicollinearity, but furthter investigation will be necessary.
 ```{r}
 scatterplotMatrix(~ log(crmrte) + prbarr + prbconv + prbpris + avgsen + log(mix), 
                   data = crime_data,
@@ -274,7 +274,7 @@ Those variables found correlated to crime rate from EDA as follow:
 
 * $density$, $pctymle$, $wcon$, $wtuc$, $wtrd$, $wfir$, $wser$, $wmfg$, $wfed$, $wsta$, $wloc$: these variables could not be directly applicable for policy suggestions.
 
-The covariates that help us further identify a causal effect are $prbarr$ and $prbconv$, $density$ and $pctymle$ based on output from scatterplots. On the other hand, the problematic covariates due to multicollinearity are $taxpc$ and $w*$ (all wages variables) seen from the scatterplot above since they will absorb some of causal effect we want to measure.
+The covariates that help us further identify and form potential causal effect are $prbarr$ and $prbconv$, $density$ and $pctymle$ based on output from scatterplots. On the other hand, the problematic covariates due to multicollinearity are $taxpc$ and $w*$ (all wages variables) seen from the scatterplot above since they will absorb some of causal effect we want to measure.
 
 We will consider building 3 model specifications:
 
@@ -291,7 +291,7 @@ AIC(model1)
 coeftest(model1, vcov = vcovHC)
 ```
 
-This model suggests that points 53, 55, and 113 have high Cook's distance, so further investigations were made to define why they are outliers comparing to the expectations of the variables of all other counties.
+This model suggests that points 53, 55, and 113 are potential outliers and actually have higher leverage in terms of influential impact, but all still within acceptable range based on Cook's distance, so further investigations were made to define if they are determined outliers comparing to the expectations of the variables of all other counties.
 ```{r}
 avg_county <- colMeans(crime_data)
 outliers_compare <- data.frame(t(avg_county))
@@ -299,9 +299,9 @@ outliers_compare$county <- 999
 outliers_compare <- rbind(crime_data[c("53","55","113"),], outliers_compare)
 head(outliers_compare)
 ```
-We see that no major deviations are found. When analyzing county 55, we see that this is an area with considerable high crime rates, but with all variables not very different from the others. Based on population density and the wages, we can infer this is a rural county, which economy is based on construction and transportation industries. The highlight here is the $taxpc$ variable: it is more than 3 times the average. This discrepancy probably is generating our leverage, but as we don't have enough evidence that this is a erroneous error, we will keep that point in the data set.
+We see that no major deviations are found. When analyzing county 55, we see that this is an area with considerable high crime rates, but with all variables not very different from the others. Based on population density and the wages, we can infer this is a rural county, which economy is based on construction and transportation industries. The highlight here is the $taxpc$ variable: it is more than 3 times the average. This discrepancy probably is generating our leverage, but as we don't have enough evidence that this is a erroneous data, we will keep that point in the dataset.
 
-The counties represented by 53 and 113 are the opposite. They have crime rates as low as 40% of the state average. Small population density and no assumptions can be made based only in the wages per industry. As we did with 55, we found no strong evidence that thi data is wrong, thus keeping the data in our data set. It is also interesting to note that the 3 outliers have completely different values for $pctmin80$, yet still have similar values for most variables. This endorses our decision to not use that variable.
+The counties represented by 53 and 113 are the opposite. They have crime rates as low as 40% of the state average. Small population density and no assumptions can be made based only on the wages per industry. As we did with 55, we found no strong evidence that this data is wrong, thus keeping the data in our dataset. It is also interesting to note that the 3 outliers have completely different values for $pctmin80$, yet still have similar values for most variables. This endorses our decision not to use that variable.
 
 ### 2. Model that includes key explanatory variables and only covariates that we believe increase the accuracy of your results.
 
@@ -332,7 +332,7 @@ outliers_compare <- rbind(crime_data[c("133"),], outliers_compare)
 outliers_compare[c("133","1"),]
 ```
 
-As expected, the $pctymle$ variable is substantially higher than the state average. However, there are no evidences that there is an error in our data. So the observation will still be used in our data set.
+As expected, the $pctymle$ variable is substantially higher than the state average. However, there are no evidences that there is an error in our data. So the observation will still be used in our dataset.
 
 ### 3. Model that includes the previous covariates, and most, if not all, other covariates.
 
@@ -378,7 +378,10 @@ While background data was not provided for this analysis, we notice that our sam
 
 ### 3. No perfect multicollinearity
 
-As R didn't warn for any perfect collinearity, this assumption is met. Additionally we visually checked for that using \texttt{scatterplotMatrix} and the correlation index.
+As R didn't warn for any perfect collinearity, this assumption is met. We can also double check from VIF to see if the assumption holds. VIF is around 1 showing variables are not correlated. Additionally we visually checked for that using \texttt{scatterplotMatrix} and the correlation index.
+```{r}
+vif(model2)
+```
 
 ### 4. Zero-conditional mean
 
@@ -397,7 +400,7 @@ plot(model2, which=3)
 bptest(model2)
 ```
 
-The fairly flat red line also suggests homoskedasticity. Despite this evidence, we will proceed with robust standard errors, because that is good conservative practice. Also, through a Breusch-Pagan test, the null hypothesis is the model has homoskedasticity. p-value indicates we can't reject the null hypothesis, meaning heteroskedasticity is not present.
+The fairly flat red line also suggests homoskedasticity. Despite this evidence, we will proceed with robust standard errors, because that is good conservative practice. Also, because sample size matters and through a Breusch-Pagan test, the null hypothesis is the model has homoskedasticity. p-value indicates we fail to reject the null hypothesis, meaning homoskedasticity property or equal variance holds.
 
 ### 6. Normality of errors
 
@@ -422,7 +425,7 @@ Next, inference for linear regression and standard errors via statistical tests 
 coeftest(model2, vcov=vcovHC)
 ```
 
-In general, Model 2 doesn't seem to violate any of the 6 linear model assumptions.
+In general, Model 2 follows the 6 classical linear model assumptions.
 
 However, Model 1 demostrates violation of zero-conditional mean, homoskedasticity, and normality of errors:
 ```{r}
@@ -449,14 +452,14 @@ Now, we could test the additional 3 variables in Model 3 and see if they are joi
 linearHypothesis(model3, c("prbconv = 0", "wloc = 0", "density = 0"), vcov = vcovHC)
 ```
 
-Next, we could test if coefficients of $prbarr$ and $prbconv$ are the same. In turns out that this hypothesis is statistically significant.
+Next, we could test if coefficients of $prbarr$ and $prbconv$ are the same. It turns out that this hypothesis is statistically significant.
 ```{r}
 linearHypothesis(model3, "prbarr = prbconv", vcov = vcovHC)
 ```
 
 ## The Omitted Variables Discussion
 
-The omitted variables discussion will be based on Model 1 with $taxpc$ dropped since its effect is minimal with following 5 variables omitted one at a time.
+The omitted variables discussion will be based on Model 1 with $taxpc$ dropped since its effect is minimal and with $prbconv$ dropped since it doesn't have statistical significance, with following 5 variables omitted one at a time.
 
 ### 1. Omitted $taxpc$
 
@@ -531,9 +534,9 @@ While our dataset has 25 variables, we noticed that more socioeconomic and infra
 
 Based on the analysis and comparison on several models, the determinants of crime are essentially probability of arrest, tax revenue per capita, and % young male. In order to anticipate  reduction of crime, the actionable policy suggestions would be as follow for local government:
 
-* Increase the probability of arrest when offense occurs. This doesn't necessarily mean increasing the number of police officers on the street as seen in our analysis. This change could be addressed with programs that incentivizes crime reporting practices and population confidence in the law enforcement. Our best model suggests that an improvement of 1 percentual point in arresting people that committed crimes may improve crime rate of 2%.
+* Increase the probability of arrest when offense occurs. This doesn't necessarily mean increasing the number of police officers on the street as seen in our analysis. This change could be addressed with programs that incentivizes crime reporting practices and population confidence in the law enforcement. Our best model suggests that an improvement of 1 percentual point in arresting people that committed crimes may improve crime rate by 2%.
 
 * Decrease the tax revenue per capita by reducing local tax rate.
-Less tax means more money in counties' economy, so it may be a way to improve earnings by the population and decrease criminality. The effect, however may not be really big, is that reducing 1 percentual point in the tax revenue per capita may reduce crime rate by approximately 0.13%. In other words, this variable may have a high statistical significance but not a practical one.
+Less tax means more money in counties' economy, so it may be a way to improve earnings by the population and decrease criminality. The effect, however may not be really big, is that reducing 1 percentual point in the tax revenue per capita may reduce crime rate by approximately 0.13%. In other words, this variable may have a high statistical significance but not a practical significance.
 
 * Decrease the percentage of young male population in communities. While this can turn into a highly unethical advice, we can try to address this matter with making other areas attractive to young male population using government fostered jobs, for example.
